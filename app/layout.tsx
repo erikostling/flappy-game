@@ -11,6 +11,8 @@ const body = Nunito({ weight: ['700', '800'], subsets: ['latin'], variable: '--f
 export const metadata: Metadata = {
   title: 'Flappy Game',
   description: 'Flyg genom tio världar, samla saker och blå mynt, och köp nya figurer.',
+  // Lagt på hemskärmen öppnas spelet utan webbläsarens ramar.
+  appleWebApp: { capable: true, title: 'Flappy Game', statusBarStyle: 'black-translucent' },
 };
 
 export const viewport: Viewport = {

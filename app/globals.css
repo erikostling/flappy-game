@@ -1,5 +1,5 @@
-/* Layout: one portrait game screen, centered and scaled to fit, on a dark ground.
-   A single deliberate look: the game world is the same in light and dark. */
+/* Layout: the game fills the whole screen; the canvas draws more of the world where the
+   screen is wider or taller than the game. One look in light and dark. */
 :root {
   --ground: #10291b;
   --text: #f4f1e0;
@@ -9,7 +9,6 @@
   --dirt: #8a5a2b;
   --white: #ffffff;
   --error: #b3261e;
-  --shadow: rgb(0 0 0 / .45);
   /* --font-lilita och --font-nunito sätts av next/font i app/layout.tsx */
   --font-display: var(--font-lilita), "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
   --font-body: var(--font-nunito), "Segoe UI", system-ui, sans-serif;
@@ -18,26 +17,36 @@
 html, body { height: 100%; }
 body {
   margin: 0;
-  box-sizing: border-box;
-  padding-block: 16px;
-  padding-inline: 16px;
+  height: 100dvh;
   background: var(--ground);
   color: var(--text);
   font-family: var(--font-body);
   display: flex;
   overflow: hidden;
+  overscroll-behavior: none;
+  /* Inget i spelet ska gå att markera av misstag; bara namnrutan tar text. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
-.stage { flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; }
-.screen { position: relative; }
+.stage { flex: 1; min-width: 0; min-height: 0; }
+.screen { position: relative; width: 100%; height: 100%; }
 canvas {
   display: block;
-  border-radius: 14px;
-  box-shadow: 0 10px 40px var(--shadow);
   touch-action: manipulation;
   cursor: pointer;
   outline: none;
 }
-canvas:focus-visible { outline: 3px solid var(--banana); outline-offset: 4px; }
+canvas:focus-visible { outline: 3px solid var(--banana); outline-offset: -3px; }
+/* Läses av spelet: hur mycket notch och hemknapp tar från skärmens kanter. */
+.safe {
+  position: fixed;
+  inset: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  visibility: hidden;
+  pointer-events: none;
+}
 /* Klassernas display-regler får inte visa det som är dolt. */
 [hidden] { display: none !important; }
 
@@ -75,6 +84,8 @@ canvas:focus-visible { outline: 3px solid var(--banana); outline-offset: 4px; }
   color: var(--dirt); letter-spacing: .06em; text-transform: uppercase;
 }
 .entry input {
+  -webkit-user-select: text;
+  user-select: text;
   width: 100%; box-sizing: border-box;
   font: 800 max(16px, calc(var(--s, 1) * 20px))/1.2 var(--font-body);
   padding: calc(var(--s, 1) * 10px);

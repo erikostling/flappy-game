@@ -33,6 +33,7 @@ export default function Home() {
           </div>
         </form>
       </div>
+      <div className="safe" id="safe" aria-hidden="true" />
       <Script src="/game.js" strategy="afterInteractive" />
     </main>
   );
