@@ -17,11 +17,9 @@
 html, body { height: 100%; }
 body {
   margin: 0;
-  height: 100dvh;
   background: var(--ground);
   color: var(--text);
   font-family: var(--font-body);
-  display: flex;
   overflow: hidden;
   overscroll-behavior: none;
   /* Inget i spelet ska gå att markera av misstag; bara namnrutan tar text. */
@@ -30,7 +28,9 @@ body {
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-.stage { flex: 1; min-width: 0; min-height: 0; }
+/* Fast över hela skärmen: lika högt som brett i alla webbläsare, också när
+   mobilens adressfält kommer och går. */
+.stage { position: fixed; inset: 0; }
 .screen { position: relative; width: 100%; height: 100%; }
 canvas {
   display: block;
@@ -38,7 +38,6 @@ canvas {
   cursor: pointer;
   outline: none;
 }
-canvas:focus-visible { outline: 3px solid var(--banana); outline-offset: -3px; }
 /* Läses av spelet: hur mycket notch och hemknapp tar från skärmens kanter. */
 .safe {
   position: fixed;
