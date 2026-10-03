@@ -1309,6 +1309,25 @@
     ctx.fillStyle = fill; ctx.fillText(str, x, y);
   }
 
+  // Rubriken på startskärmen: varje bokstav i en egen färg, och bokstäverna guppar
+  // i en våg. Alla konturer ritas före bokstäverna, så att ingen kontur täcker grannen.
+  const TITLE_COLORS = ['#ff4f6d', '#ff9f1c', '#ffd23f', '#3ccf6e', '#36b3ec', '#9b6dff'];
+  function drawTitle(text, x, y, size) {
+    ctx.font = `${size}px ${DISPLAY}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    const chars = [...text], widths = chars.map(ch => ctx.measureText(ch).width);
+    let left = x - widths.reduce((a, b) => a + b, 0) / 2, n = 0;
+    const letters = chars.map((ch, i) => {
+      const at = { ch, x: left + widths[i] / 2, y: y + Math.sin(time * 3 - i * 0.5) * 3, color: TITLE_COLORS[n % TITLE_COLORS.length] };
+      left += widths[i];
+      if (ch !== ' ') n++;
+      return at;
+    }).filter(l => l.ch !== ' ');
+    ctx.lineWidth = size / 6; ctx.strokeStyle = C.ink;
+    for (const l of letters) ctx.strokeText(l.ch, l.x, l.y);
+    for (const l of letters) { ctx.fillStyle = l.color; ctx.fillText(l.ch, l.x, l.y); }
+  }
+
   // Upprepade lager: element nummer i ligger på i * step + offset.
   // Något med jämna mellanrum över hela bredden som syns; `i` räknar dem i världen.
   function repeat(offset, step, fn) {
@@ -4114,7 +4133,7 @@
       }
 
       if (state === 'ready') {
-        say('Flappy Game', W / 2, 112, 52, { fill: C.banana });
+        drawTitle('Flappy Game', W / 2, 112, 52);
         // den valda figuren, stor
         drawFigure(charIndex, W / 2, 244 + Math.sin(time * 3) * 6, { scale: 2.6, beat: Math.sin(time * 9) * 0.6 });
         say(CHARACTERS[charIndex].name, W / 2, 348, 26);
