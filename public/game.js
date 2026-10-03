@@ -52,6 +52,7 @@
   };
   const PUMPA = { body: '#ff8c1a', dark: '#e0700a', rib: '#c95c08', stem: '#5a7a2a', leaf: '#6cbf3a', leafBack: '#4f9e2c', leafEdge: '#3f8a24', glow: '#ffe066', carve: '#5a2a00' };
   const SOL = { core: '#ffd23f', edge: '#f5a300', ray: '#ffb800', cheek: '#ff9a6a', glasses: '#1d2b1f', smile: '#c26a00' };
+  const GULD = { main: '#ffd23f', mid: '#f5b301', dark: '#c98f00', edge: '#8a6200', light: '#fff1a8', crown: '#ffe066', gems: ['#e63946', '#2f80ed', '#2bb673'] };
   const HERO = {
     suit: '#2f6fd6', suitDark: '#1f4fa8', cape: '#e63946', capeDark: '#b5212e', belt: '#ffd23f',
     skin: '#ffd6b8', hair: '#3a2a1a', mask: '#1d2b4f', glove: '#e63946', smile: '#8a4a2a',
@@ -90,6 +91,8 @@
     { id: 'ko', name: 'Ko', world: 'Bondgård', flight: 'Kon flaxar med små vingar', draw: drawCow },
     { id: 'kamel', name: 'Kamel', world: 'Öken', flight: 'Kamelen åker flygande matta', draw: drawCamel },
     { id: 'alien', name: 'Rymdvarelse', world: 'Främmande planet', flight: 'Rymdvarelsen flyger i sitt tefat', draw: drawAlien },
+    // en gåva till Wilhelm, som var först på topplistan
+    { id: 'guld', name: 'Guldperson', world: 'Guldland', flight: 'Guldpersonen flyger på gyllene vingar', draw: drawGold, gift: 'wilhelm' },
   ];
 
   const THEMES = {
@@ -509,7 +512,7 @@
   // de fem nästa 5, och så vidare. Först kommer de två andra startfigurerna, sedan
   // resten i samlingens ordning, så priset är detsamma vilken man än valde först.
   const PRICES = [3, 5, 10, 15, 20], PRICE_GROUP = 5;
-  const OTHER_FIGURES = CHARACTERS.map(c => c.id).filter(id => !START_FIGURES.includes(id));
+  const OTHER_FIGURES = CHARACTERS.filter(c => !c.gift).map(c => c.id).filter(id => !START_FIGURES.includes(id));
   function figurePrice(ci) {
     const id = CHARACTERS[ci].id;
     const place = START_FIGURES.includes(id) ? 0 : START_FIGURES.length - 1 + OTHER_FIGURES.indexOf(id);
@@ -544,6 +547,22 @@
 
   // Första gången öppnas Figurer av sig själv, så att man väljer sin första figur där.
   if (!firstFigure) overlay = 'figures';
+
+  // En gåvofigur går inte att köpa och syns bara för den den är till: enheten som
+  // äger namnet på topplistan, vilket servern säger (`ownedNames`). Den blir vald
+  // direkt, och startskärmen säger vem den är till tills omgången börjar.
+  let giftNote = '', ownedNames = new Set();
+  function giveGifts(withSound) {
+    CHARACTERS.forEach((c, ci) => {
+      if (choosingFirst() || !c.gift || !ownedNames.has(c.gift) || unlocked.has(c.id)) return;
+      unlocked.add(c.id);
+      store('flappy-apa-upplasta', JSON.stringify([...unlocked]));
+      charIndex = ci;
+      store('flappy-apa-figur', c.id);
+      giftNote = `${c.name}en är en gåva till dig, ${(load('flappy-apa-namn') || c.gift).trim()}!`;
+      if (withSound) sfx.reward();
+    });
+  }
 
   // Det första valet låses när man börjar flyga första gången.
   function lockFirstFigure() {
@@ -609,7 +628,8 @@
 
   // ---------- Topplistan ----------
   // Listan hämtas från och sparas via /api/scores, som håller den i Supabase med ett
-  // namn per rad och dess bästa resultat.
+  // namn per rad och dess bästa resultat. Ett namn hör till den enhet som tog det
+  // först; enheten känns igen på en slumpad nyckel som bara finns här.
   let mode = 'loading'; // 'loading' | 'ready' | 'error'
   let topList = [];
   let entryScore = 0, pendingEntry = false, afterSave = false, savedEntry = null, saving = false;
@@ -648,36 +668,54 @@
   }
   const rankFor = s => board().filter(e => e.score >= s).length + 1;
 
-  async function scoresRequest(init) {
-    const res = await fetch('/api/scores', { cache: 'no-store', ...init });
+  function deviceKey() {
+    let key = load('flappy-apa-nyckel');
+    if (!key) {
+      key = window.crypto?.randomUUID?.() ?? Array.from({ length: 4 }, () => Math.random().toString(36).slice(2)).join('');
+      store('flappy-apa-nyckel', key);
+    }
+    return key;
+  }
+
+  // Varje svar har listan och vilka namn som hör till den här enheten; en gåva till
+  // ett av dem lämnas ut direkt.
+  async function scoresRequest(path = '/api/scores', body = null, withSound = false) {
+    const res = await fetch(path, {
+      method: body ? 'POST' : 'GET',
+      cache: 'no-store',
+      headers: { 'x-player-key': deviceKey(), ...(body ? { 'content-type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
     if (!res.ok) throw Object.assign(new Error('Topplistan svarade ' + res.status), { status: res.status });
-    return topTen(cleanEntries((await res.json())?.entries));
+    const data = await res.json();
+    topList = topTen(cleanEntries(data?.entries));
+    ownedNames = new Set(Array.isArray(data?.mine) ? data.mine : []);
+    mode = 'ready';
+    giveGifts(withSound);
   }
 
   // Hämtar listan på nytt; går det inte behålls den som redan hämtats.
-  async function refreshBoard() {
+  async function refreshBoard(path, body) {
     try {
-      topList = await scoresRequest();
-      mode = 'ready';
+      await scoresRequest(path, body);
     } catch {
       if (mode === 'loading') mode = 'error';
     }
   }
-  refreshBoard();
+  // Ett namn som sparades här innan namnen fick ägare tas först, så att det blir enhetens.
+  const savedName = load('flappy-apa-namn');
+  if (savedName) refreshBoard('/api/scores/claim', { name: savedName });
+  else refreshBoard();
 
   async function saveEntry(name) {
     const score = entryScore;
-    topList = await scoresRequest({
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, score, figure: CHARACTERS[charIndex].id }),
-    });
-    mode = 'ready';
+    await scoresRequest('/api/scores', { name, score, figure: CHARACTERS[charIndex].id }, true);
     // raden som servern sparade, så att den markeras på listan
     return topList.find(e => nameKey(e.name) === nameKey(name) && e.score === score) ?? null;
   }
 
   function saveError(err) {
+    if (err?.status === 409) return 'Det namnet hör till någon annan. Välj ett annat.';
     if (err?.status === 429) return 'Listan tar inte emot fler namn just nu.';
     return 'Det gick inte att spara. Försök igen.';
   }
@@ -931,7 +969,7 @@
   // Figurer som låter på sitt eget sätt när de flaxar; resten låter som vingar.
   const FLAP_SOUND = {
     astronaut: 'jet', robot: 'jet', drake: 'fire', bi: 'buzz', spoke: 'woo', alien: 'zap',
-    blackfisk: 'bubble', groda: 'boing', ko: 'moo', hund: 'woof', enhorning: 'chime', sol: 'chime', tomte: 'chime',
+    blackfisk: 'bubble', groda: 'boing', ko: 'moo', hund: 'woof', enhorning: 'chime', sol: 'chime', tomte: 'chime', guld: 'chime',
   };
 
   // ---------- Spelets gång ----------
@@ -1012,6 +1050,7 @@
     if (state === 'ready') {
       if (choosingFirst()) lockFirstFigure();
       state = 'playing';
+      giftNote = '';
     }
     if (state === 'playing') {
       paused = false; player.vy = FLAP; player.flapT = 0.25;
@@ -1203,7 +1242,9 @@
     if (!name) { showEntryError('Skriv ett namn först.'); entryName.focus(); return; }
     const held = board().find(e => nameKey(e.name) === nameKey(name));
     if (held && held.score >= entryScore) {
-      showEntryError(`${held.name} har redan ${held.score} poäng på listan. Välj ett annat namn eller hoppa över.`);
+      showEntryError(ownedNames.has(nameKey(name))
+        ? `Ditt bästa på listan är redan ${held.score} poäng.`
+        : `${held.name} har redan ${held.score} poäng på listan. Välj ett annat namn eller hoppa över.`);
       entryName.focus();
       return;
     }
@@ -3151,6 +3192,43 @@
     ctx.beginPath(); ctx.arc(8, -5, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
   }
 
+  // En person i guld som flyger med gyllene vingar, med krona och gnistor runt sig.
+  function drawGold({ beat, dead }) {
+    featherWing(-8, 2, 0.8 + beat, GULD.dark, GULD.edge);
+    oval(-14, 13, 7, 3.5, GULD.dark);
+    oval(-21, 13.5, 3.6, 3.4, GULD.mid);
+    oval(-16, 9, 8, 3.8, GULD.mid);
+    oval(-24, 9.5, 4, 3.8, GULD.main);
+    ovalEdge(-4, 6, 12, 8, GULD.main, GULD.edge);
+    oval(-7, 3, 7, 2.6, GULD.light);
+    star(2, 5, 4.5, C.white);
+    oval(12, 1, 7, 3.2, GULD.main);
+    blob(19, 1, 3.6, GULD.mid);
+
+    ovalEdge(5, -9, 9.5, 9.5, GULD.main, GULD.edge);
+    blob(1, -13, 3, GULD.light);
+    poly([[-3, -15], [-2, -25], [2.5, -19], [5.5, -27], [8.5, -19], [13, -25], [14, -15]], GULD.crown, GULD.edge);
+    GULD.gems.forEach((col, k) => blob(1.5 + k * 4.5, -17.5, 1.4, col));
+    if (dead) {
+      xEye(3, -9, 2);
+      xEye(10, -9, 2);
+    } else {
+      oval(3, -9, 1.7, 2.1, C.ink);
+      oval(10, -9, 1.7, 2.1, C.ink);
+      blob(3.6, -9.8, 0.6, C.white);
+      blob(10.6, -9.8, 0.6, C.white);
+    }
+    ctx.strokeStyle = GULD.edge; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(7.5, -5, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+
+    featherWing(-8, 2, 0.35 + beat, GULD.main, GULD.edge);
+    if (!dead) {
+      for (const [x, y, k] of [[-20, -14, 0], [22, -16, 2], [-2, 22, 4]]) {
+        star(x, y, 2.5 + 1.5 * Math.sin(time * 6 + k), GULD.light);
+      }
+    }
+  }
+
   function drawPanda({ boost, dead }) {
     if (!dead) {
       for (let k = 1; k <= 3; k++) {
@@ -3782,7 +3860,7 @@
   function figureLayout() {
     // första gången är de tre startfigurerna valbara; sedan de egna
     const owned = PICKER.filter(isUnlocked);
-    const missing = PICKER.filter(ci => !owned.includes(ci));
+    const missing = PICKER.filter(ci => !owned.includes(ci) && !CHARACTERS[ci].gift);
     const sections = [], cells = [];
     let y = FIG_PANEL.y + 76;
     const firstTitle = choosingFirst() ? 'Välj din första figur' : `Dina figurer (${owned.length})`;
@@ -3803,7 +3881,8 @@
     const P = FIG_PANEL, { sections, cells, empty } = figureLayout();
     dim();
     drawPanel(P, 'Figurer');
-    const coinsLine = `${choosingFirst() ? 0 : unlocked.size} av ${CHARACTERS.length} figurer · ${blueCoins} blå mynt`;
+    const total = CHARACTERS.filter(c => !c.gift || unlocked.has(c.id)).length;
+    const coinsLine = `${choosingFirst() ? 0 : unlocked.size} av ${total} figurer · ${blueCoins} blå mynt`;
     say(coinsLine, W / 2 + 9, P.y + 58, 13, { font: BODY, weight: '800', fill: C.dirt, stroke: null });
     ctx.font = `800 13px ${BODY}`;
     drawItem(BLUE, W / 2 + 9 - ctx.measureText(coinsLine).width / 2 - 12, P.y + 58, 0.6);
@@ -4039,6 +4118,7 @@
         // den valda figuren, stor
         drawFigure(charIndex, W / 2, 244 + Math.sin(time * 3) * 6, { scale: 2.6, beat: Math.sin(time * 9) * 0.6 });
         say(CHARACTERS[charIndex].name, W / 2, 348, 26);
+        if (giftNote) say(giftNote, W / 2, 374, 15, { font: BODY, weight: '800', fill: GULD.crown });
       }
 
       if (state === 'over') drawOver();
