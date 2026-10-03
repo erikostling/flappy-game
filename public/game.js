@@ -625,10 +625,11 @@
   const worldName = () => world().name;
   const currentObstacle = () => OBSTACLES.findIndex(o => o.id === world().obstacle);
   // Svårare mot slutet: från den sjätte världen krymper öppningen 5 för varje värld,
-  // och från den åttonde glider hindren upp och ner, längre för varje värld.
+  // och från den åttonde glider hindren upp och ner, längre för varje värld: 30, 38
+  // och 46 åt varje håll, ett varv på drygt 3 sekunder, så att det syns direkt.
   const gapSize = () => GAP - 5 * Math.max(0, worldStep - 4);
-  const glideSize = () => (worldStep >= 7 ? 20 + 8 * (worldStep - 7) : 0);
-  const GLIDE_SPEED = 1.4, WORLD_BONUS = 2;
+  const glideSize = () => (worldStep >= 7 ? 30 + 8 * (worldStep - 7) : 0);
+  const GLIDE_SPEED = 2.0, WORLD_BONUS = 2;
   // Det som blir nytt i en värld visas under dess namn när man flyger in.
   const worldNews = () => (worldStep === 5 ? 'Öppningarna blir smalare!' : worldStep === 7 ? 'Nu rör sig hindren!' : '');
 
