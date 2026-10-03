@@ -593,9 +593,9 @@
 
   // ---------- Topplistan ----------
   // Listan hämtas från och sparas via /api/scores, som håller den i Supabase med ett
-  // namn per rad och dess bästa resultat. Svarar servern inte sparas listan på enheten.
-  let mode = 'loading'; // 'shared' | 'local'
-  let sharedBoard = [], localBoard = [];
+  // namn per rad och dess bästa resultat.
+  let mode = 'loading'; // 'loading' | 'ready' | 'error'
+  let topList = [];
   let entryScore = 0, pendingEntry = false, afterSave = false, savedEntry = null, saving = false;
 
   function cleanEntries(raw) {
@@ -622,14 +622,13 @@
     return [...best.values()].sort(byRank).slice(0, TOP);
   }
 
-  try { localBoard = topTen(cleanEntries(JSON.parse(load('flappy-apa-topp10') || '[]'))); } catch {}
-
-  const board = () => (mode === 'shared' ? sharedBoard : localBoard);
+  const board = () => topList;
   const sameEntry = (a, b) => !!a && !!b && a.at === b.at && a.name === b.name && a.score === b.score;
 
+  // Går listan inte att hämta går den inte heller att skriva in sig på.
   function qualifies(s) {
     const b = board();
-    return s > 0 && (b.length < TOP || s > b[TOP - 1].score);
+    return mode === 'ready' && s > 0 && (b.length < TOP || s > b[TOP - 1].score);
   }
   const rankFor = s => board().filter(e => e.score >= s).length + 1;
 
@@ -639,32 +638,27 @@
     return topTen(cleanEntries((await res.json())?.entries));
   }
 
-  // Hämtar listan på nytt. Går det inte första gången används listan på enheten;
-  // går det inte senare behålls den som redan hämtats.
+  // Hämtar listan på nytt; går det inte behålls den som redan hämtats.
   async function refreshBoard() {
     try {
-      sharedBoard = await scoresRequest();
-      mode = 'shared';
+      topList = await scoresRequest();
+      mode = 'ready';
     } catch {
-      if (mode === 'loading') mode = 'local';
+      if (mode === 'loading') mode = 'error';
     }
   }
   refreshBoard();
 
   async function saveEntry(name) {
-    const entry = { name, score: entryScore, figure: CHARACTERS[charIndex].id, at: new Date().toISOString() };
-    if (mode !== 'shared') {
-      localBoard = topTen([...localBoard, entry]);
-      store('flappy-apa-topp10', JSON.stringify(localBoard));
-      return entry;
-    }
-    sharedBoard = await scoresRequest({
+    const score = entryScore;
+    topList = await scoresRequest({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: entry.name, score: entry.score, figure: entry.figure }),
+      body: JSON.stringify({ name, score, figure: CHARACTERS[charIndex].id }),
     });
+    mode = 'ready';
     // raden som servern sparade, så att den markeras på listan
-    return sharedBoard.find(e => nameKey(e.name) === nameKey(name) && e.score === entry.score) ?? entry;
+    return topList.find(e => nameKey(e.name) === nameKey(name) && e.score === score) ?? null;
   }
 
   function saveError(err) {
@@ -3886,13 +3880,13 @@
     drawPanel(PANEL, 'Topp 10');
     const where = {
       loading: 'Hämtar listan…',
-      shared: 'Alla som spelar',
-      local: 'Sparas på den här enheten',
+      ready: 'Alla som spelar',
+      error: 'Listan går inte att hämta just nu',
     }[mode];
     say(where, W / 2, PANEL.y + 62, 13, { font: BODY, weight: '800', fill: C.dirt, stroke: null });
 
     const list = board();
-    if (!list.length && mode !== 'loading') {
+    if (!list.length && mode === 'ready') {
       say('Ingen på listan än', W / 2, PANEL.y + 190, 24, { fill: C.ink, stroke: null });
       say('Spela och bli först!', W / 2, PANEL.y + 222, 16, { font: BODY, weight: '800', fill: C.dirt, stroke: null });
     }

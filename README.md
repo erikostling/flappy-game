@@ -13,9 +13,7 @@ pnpm dev
 
 Öppna http://localhost:3000.
 
-Utan Supabase-nycklar fungerar allt utom den delade topplistan. Den sparas då bara i webbläsaren.
-
-För att köra mot Supabase: kopiera `.env.example` till `.env.local` och fyll i projektets värden.
+Topplistan behöver Supabase: kopiera `.env.example` till `.env.local` och fyll i projektets värden. Utan dem fungerar allt utom topplistan, som då visar att den inte går att hämta.
 
 ## Struktur
 
@@ -28,7 +26,7 @@ För att köra mot Supabase: kopiera `.env.example` till `.env.local` och fyll i
 | `lib/supabase.ts` | Supabase-klienten |
 | `public/game.js` | Spelet |
 | `public/musik/`, `public/ljud/` | Musik och ljudeffekter (gjorda med ElevenLabs) |
-| `supabase/migrations/` | Tabellen för topplistan |
+| `supabase/migrations/` | Tabellen och funktionen för topplistan |
 
 ## Topplistan
 
@@ -38,12 +36,13 @@ För att köra mot Supabase: kopiera `.env.example` till `.env.local` och fyll i
 
 Ett namn står bara en gång på listan, med sitt bästa resultat. "Erik" och "erik" räknas som samma namn.
 
-I Supabase:
+I Supabase (projektet "Flappy game"):
 - Tabellen `scores` får alla läsa.
-- Ingen kan skriva direkt i tabellen. Resultat sparas med funktionen `submit_score`. Den kontrollerar värdena och skriver bara över ett sämre resultat.
+- Ingen kan skriva direkt i tabellen. Resultat sparas med funktionen `submit_score`. Den snyggar till namnet, räknar själv fram vilka namn som är samma, kontrollerar värdena och skriver bara över ett sämre resultat.
 - Därför räcker den publika nyckeln. Ingen hemlig nyckel behövs.
+- Supabase varnar för att vem som helst kan anropa `submit_score`. Det är avsiktligt: det är samma sak som spelets eget API tillåter.
 
-Svarar API:t 503, för att nycklarna saknas, eller 502, för att Supabase inte svarar, sparar spelet listan på enheten i stället.
+API:t svarar 503 om nycklarna saknas och 502 om Supabase inte svarar. Då visar spelet att listan inte går att hämta, och ingen kan skriva in sig.
 
 ## Deploy på Vercel
 
