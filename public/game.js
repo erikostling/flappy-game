@@ -97,6 +97,30 @@
     { id: 'kamel', name: 'Kamel', world: 'Öken', flight: 'Kamelen åker flygande matta', draw: drawCamel },
     { id: 'alien', name: 'Rymdvarelse', world: 'Främmande planet', flight: 'Rymdvarelsen flyger i sitt tefat', draw: drawAlien },
     { id: 'prinsessa', name: 'Prinsessa', world: 'Slott', flight: 'Prinsessan flyger på älvvingar', draw: drawPrincess },
+    { id: 'rav', name: 'Räv', world: 'Skog', flight: 'Räven flyger på vita vingar', draw: drawFox },
+    { id: 'gris', name: 'Gris', world: 'Bondgård', flight: 'Grisen flaxar med små vingar', draw: drawPig },
+    { id: 'elefant', name: 'Elefant', world: 'Savann', flight: 'Elefanten flaxar med öronen', draw: drawElephant },
+    { id: 'giraff', name: 'Giraff', world: 'Savann', flight: 'Giraffen flyger på vingar', draw: drawGiraffe },
+    { id: 'krokodil', name: 'Krokodil', world: 'Träsk', flight: 'Krokodilen flaxar med gröna vingar', draw: drawCroc },
+    { id: 'haj', name: 'Haj', world: 'Havet', flight: 'Hajen simmar genom luften', draw: drawShark },
+    { id: 'delfin', name: 'Delfin', world: 'Havet', flight: 'Delfinen simmar genom luften', draw: drawDolphin },
+    { id: 'skoldpadda', name: 'Sköldpadda', world: 'Strand', flight: 'Sköldpaddan flyger med propeller', draw: drawTurtle },
+    { id: 'nyckelpiga', name: 'Nyckelpiga', world: 'Äng', flight: 'Nyckelpigan surrar med sina vingar', draw: drawLadybug },
+    { id: 'papegoja', name: 'Papegoja', world: 'Djungel', flight: 'Papegojan flaxar med färgglada vingar', draw: drawParrot },
+    { id: 'flamingo', name: 'Flamingo', world: 'Lagun', flight: 'Flamingon flyger med rosa vingar', draw: drawFlamingo },
+    { id: 'tiger', name: 'Tiger', world: 'Djungel', flight: 'Tigern flyger på vingar', draw: drawTiger },
+    { id: 'koala', name: 'Koala', world: 'Eukalyptusskog', flight: 'Koalan flaxar med eukalyptusblad', draw: drawKoala },
+    { id: 'igelkott', name: 'Igelkott', world: 'Trädgård', flight: 'Igelkotten flyger på vingar', draw: drawHedgehog },
+    { id: 'alg', name: 'Älg', world: 'Skog', flight: 'Älgen flyger på vingar med halsduk', draw: drawMoose },
+    { id: 'kyckling', name: 'Kyckling', world: 'Bondgård', flight: 'Kycklingen flaxar med små vingar', draw: drawChick },
+    { id: 'fladdermus', name: 'Fladdermus', world: 'Grotta', flight: 'Fladdermusen flaxar med läderartade vingar', draw: drawBat },
+    { id: 'pirat', name: 'Pirat', world: 'Hav', flight: 'Piraten rider på en flygande tunna', draw: drawPirate },
+    { id: 'ninja', name: 'Ninja', world: 'Tak', flight: 'Ninjan hoppar genom luften', draw: drawNinja },
+    { id: 'riddare', name: 'Riddare', world: 'Slott', flight: 'Riddaren flyger på vita vingar', draw: drawKnight },
+    { id: 'trollkarl', name: 'Trollkarl', world: 'Torn', flight: 'Trollkarlen svävar med magi', draw: drawWizard },
+    { id: 'haxa', name: 'Häxa', world: 'Spöknatt', flight: 'Häxan flyger på sin kvast', draw: drawWitch },
+    { id: 'sjojungfru', name: 'Sjöjungfru', world: 'Havet', flight: 'Sjöjungfrun simmar genom luften', draw: drawMermaid },
+    { id: 'snogubbe', name: 'Snögubbe', world: 'Vinter', flight: 'Snögubben flaxar med pinnarmarna', draw: drawSnowman },
     // en gåva till Wilhelm, som var först på topplistan
     { id: 'guld', name: 'Guldperson', world: 'Guldland', flight: 'Guldpersonen flyger på gyllene vingar', draw: drawGold, gift: 'wilhelm' },
   ];
@@ -517,7 +541,7 @@
   // Priset i blå mynt för varje grupp om fem figurer att köpa: de fem första kostar 3,
   // de fem nästa 5, och så vidare. Först kommer de två andra startfigurerna, sedan
   // resten i samlingens ordning, så priset är detsamma vilken man än valde först.
-  const PRICES = [3, 5, 10, 15, 20], PRICE_GROUP = 5;
+  const PRICES = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45], PRICE_GROUP = 5;
   const OTHER_FIGURES = CHARACTERS.filter(c => !c.gift).map(c => c.id).filter(id => !START_FIGURES.includes(id));
   function figurePrice(ci) {
     const id = CHARACTERS[ci].id;
@@ -977,6 +1001,8 @@
   const FLAP_SOUND = {
     astronaut: 'jet', robot: 'jet', drake: 'fire', bi: 'buzz', spoke: 'woo', alien: 'zap',
     blackfisk: 'bubble', groda: 'boing', ko: 'moo', hund: 'woof', enhorning: 'chime', sol: 'chime', tomte: 'chime', guld: 'chime', prinsessa: 'chime',
+    haj: 'bubble', delfin: 'bubble', sjojungfru: 'bubble', pirat: 'jet', trollkarl: 'chime', haxa: 'woo',
+    skoldpadda: 'buzz', nyckelpiga: 'buzz',
   };
 
   // ---------- Spelets gång ----------
@@ -1087,6 +1113,7 @@
     sfx.click();
     overlay = name;
     if (name === 'scores') refreshBoard();
+    if (name === 'figures') figPage = 0;
     if (state === 'playing') paused = true;
   }
   function closeOverlay() { overlay = null; canvas.focus({ preventScroll: true }); }
@@ -3309,6 +3336,560 @@
     if (boost && !dead) for (const [x, y] of [[-18, 12], [-24, 4]]) star(x, y, 2.2, PRINS.dressLight);
   }
 
+  // ---------- De 24 nya figurerna ----------
+  // Samma storlek och stil som de andra: ritade kring (0, 0), vända åt höger.
+
+  const RAV = { fur: '#f07f2e', dark: '#b8541a', white: '#fff4e6', black: '#3a2a20' };
+  const GRIS = { skin: '#ffb3c6', dark: '#e07a98', snout: '#ff9cbb', blush: '#ff8fb0' };
+  const ELEFANT = { skin: '#a9b4c2', dark: '#6f7b8a', ear: '#c3ccd8', inner: '#f3b6c8', tusk: '#fffaf0' };
+  const GIRAFF = { fur: '#f6c445', spot: '#c9781e', edge: '#a4621a', horn: '#7a4a1a', muzzle: '#f2d79b' };
+  const KROKO = { skin: '#5fae4e', dark: '#3c7a32', belly: '#d6e8a0', tooth: '#ffffff' };
+  const HAJ = { skin: '#6c8fb3', dark: '#3f5f80', belly: '#eef4fa', gill: '#4d7090' };
+  const DELFIN = { skin: '#59a8e8', dark: '#2f78b8', belly: '#dff1ff' };
+  const SKOLD = { shell: '#4f9e5f', pattern: '#7cc36e', edge: '#2f6b3a', skin: '#a7d17a', skinEdge: '#6f9e4a', prop: '#e63946', pole: '#555b66' };
+  const NYCKEL = { red: '#e63946', dark: '#9e1b25', black: '#22252b', wing: 'rgba(235,248,255,0.75)', wingEdge: '#9cc8e8' };
+  const PAPEG = { red: '#e63946', dark: '#9e1b25', beak: '#ffe8a3', beakDark: '#3a2f33', wings: ['#2f80ed', '#ffd23f', '#2bb673'], wingEdge: '#1a4f99' };
+  const FLAM = { pink: '#ff8fb8', dark: '#e0568a', light: '#ffc2d8', beak: '#2a2a2a', beakBase: '#ffe2ec' };
+  const TIGER = { fur: '#ff9a2e', dark: '#c4600e', stripe: '#2a1d16', white: '#fff4e6', nose: '#ff8fa3' };
+  const KOALA = { fur: '#9aa5b1', dark: '#6b7682', light: '#dfe5ea', nose: '#2a2d33', leaf: '#6cbf4a', leafDark: '#3f8a34' };
+  const IGEL = { spike: '#7a5636', spikeDark: '#4f3620', face: '#e9c99a', faceEdge: '#b8946a', nose: '#2a1d16', belly: '#f3dcb4' };
+  const ALG = { fur: '#8a5a3a', dark: '#5e3a22', muzzle: '#a8784f', antler: '#e8d3a8', antlerEdge: '#a8906a', blue: '#2f6fd6', yellow: '#ffd23f' };
+  const KYCK = { yellow: '#ffe066', dark: '#e0b400', beak: '#ff9f1c', shell: '#fffaf0', shellEdge: '#d8ccb4', cheek: '#ffb3a0' };
+  const FLADDER = { body: '#5a4370', dark: '#2e2040', wing: '#3d2c52', inner: '#ff9ec4', fang: '#ffffff' };
+  const PIRAT = { skin: '#ffd6b8', skinEdge: '#e0a98c', shirt: '#ffffff', stripe: '#e63946', bandana: '#e63946', patch: '#1d1d1d', beard: '#5a3a22', pants: '#2a2a33', barrel: '#a0703a', barrelDark: '#6b4423', band: '#5a5f66', flame: '#ff9f1c', core: '#ffe066' };
+  const NINJA = { suit: '#2a2d3a', dark: '#15161d', band: '#e63946', skin: '#ffd6b8' };
+  const RIDDARE = { metal: '#c3ccd6', dark: '#7d8896', shine: '#eef2f6', plume: '#e63946', shield: '#2f6fd6', shieldEdge: '#1a4f99', cross: '#ffd23f' };
+  const TROLL = { robe: '#3b4fc4', dark: '#24318a', star: '#ffe066', beard: '#ffffff', beardEdge: '#c9c9d6', skin: '#ffd6b8', skinEdge: '#e0a98c', staff: '#8a5a2b', orb: '#7ff0ff' };
+  const HAXA = { dress: '#7b3fb8', dark: '#4a2275', hat: '#2a1f3a', skin: '#c8f0a8', skinEdge: '#7fb85a', hair: '#ff8c1a', broom: '#8a5a2b', bristle: '#d9a650', bristleEdge: '#a6782f', band: '#e63946' };
+  const SJOJ = { tail: '#2bb6a0', tailDark: '#1a7f70', scale: '#5fd8c4', fin: '#7ff0dd', skin: '#ffd9c2', skinEdge: '#e0a98c', hair: '#e63946', hairDark: '#a8202a', top: '#a78bfa', topEdge: '#7a5ad8' };
+  const SNO = { snow: '#ffffff', edge: '#b9c8dc', coal: '#2a2a2a', carrot: '#ff8c1a', scarf: '#e63946', scarfDark: '#a8202a', hat: '#2a2a33', band: '#e63946', stick: '#6b4423' };
+
+  // en fylld och kantad rundad rektangel
+  function fillBox(x, y, w, h, r, fill, edge) {
+    rr(x, y, w, h, r);
+    ctx.fillStyle = fill; ctx.fill();
+    if (edge) { ctx.strokeStyle = edge; ctx.lineWidth = 1.5; ctx.stroke(); }
+  }
+
+  // ett leende som en båge
+  function smile(x, y, r, color = C.ink, width = 1.3) {
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, r, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  }
+
+  // små runda ögon för figurer med mindre huvud
+  function dotEye(x, y, dead, r = 1.4) {
+    if (dead) return xEye(x, y, 1.7);
+    oval(x, y, r, r * 1.3, C.ink);
+    blob(x + r * 0.35, y - r * 0.5, r * 0.4, C.white);
+  }
+
+  function drawFox({ beat, dead }) {
+    featherWing(-8, 2, 0.8 + beat, C.wingBack, C.wingEdge);
+    ovalEdge(-19, 9, 10, 6, RAV.fur, RAV.dark, -0.5);
+    oval(-26, 5, 4.5, 3.5, RAV.white, -0.5);
+    for (const lx of [-9, 2]) oval(lx, 19, 3.5, 4.5, RAV.black);
+    ovalEdge(-3, 9, 12, 9.5, RAV.fur, RAV.dark);
+    oval(0, 12, 6.5, 5.5, RAV.white);
+    poly([[-6, -12], [-4, -25], [2, -14]], RAV.fur, RAV.dark);
+    poly([[-4.5, -14], [-3.5, -21], [0, -14.5]], RAV.black);
+    poly([[5, -14], [11, -25], [13, -11]], RAV.fur, RAV.dark);
+    poly([[7, -14], [10.5, -21], [11.5, -12.5]], RAV.black);
+    ovalEdge(3, -4, 12, 11, RAV.fur, RAV.dark);
+    poly([[4, -1], [21, -2], [17, 5], [6, 6]], RAV.white);
+    blob(21, -2.5, 2.2, RAV.black);
+    frontEye(4, -6, dead);
+    frontEye(11, -6, dead);
+    featherWing(-8, 2, 0.35 + beat, C.wing, C.wingEdge);
+  }
+
+  function drawPig({ beat, dead }) {
+    featherWing(-6, 0, 0.8 + beat, C.wingBack, C.wingEdge);
+    ctx.strokeStyle = GRIS.dark; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(-19, 5, 3.5, 0.5, Math.PI * 1.8); ctx.stroke();
+    for (const lx of [-10, -2, 6]) oval(lx, 18, 3, 4, GRIS.dark);
+    ovalEdge(-2, 7, 15, 11, GRIS.skin, GRIS.dark);
+    poly([[-1, -12], [1, -21], [6, -14]], GRIS.skin, GRIS.dark);
+    poly([[9, -13], [13, -21], [15, -11]], GRIS.skin, GRIS.dark);
+    ovalEdge(7, -5, 10, 9, GRIS.skin, GRIS.dark);
+    ovalEdge(16, -3, 4.5, 3.8, GRIS.snout, GRIS.dark);
+    blob(14.8, -3, 0.9, GRIS.dark);
+    blob(17.4, -3, 0.9, GRIS.dark);
+    frontEye(4.5, -8, dead);
+    frontEye(11, -8.5, dead);
+    oval(4, -2, 2, 1.2, GRIS.blush);
+    featherWing(-6, 0, 0.35 + beat, C.wing, C.wingEdge);
+  }
+
+  function drawElephant({ beat, dead }) {
+    // örat bakom huvudet och det närmre flaxar
+    ovalEdge(-4, -7, 8, 11, ELEFANT.ear, ELEFANT.dark, -0.5 - beat * 0.7);
+    for (const lx of [-11, 2]) fillBox(lx - 3.5, 11, 7, 10, 3, ELEFANT.skin, ELEFANT.dark);
+    ctx.strokeStyle = ELEFANT.dark; ctx.lineWidth = 1.5; seg(-17, 5, -22, 9);
+    ovalEdge(-4, 6, 14, 10, ELEFANT.skin, ELEFANT.dark);
+    ovalEdge(7, -5, 11, 10, ELEFANT.skin, ELEFANT.dark);
+    ctx.lineCap = 'round';
+    for (const [color, width] of [[ELEFANT.dark, 7.5], [ELEFANT.skin, 5]]) {
+      ctx.strokeStyle = color; ctx.lineWidth = width;
+      ctx.beginPath(); ctx.moveTo(15, -2); ctx.quadraticCurveTo(25, 1, 22, 11); ctx.stroke();
+    }
+    poly([[13, 2], [18, 6], [14, 6.5]], ELEFANT.tusk, ELEFANT.dark, 1);
+    frontEye(10, -8, dead);
+    ovalEdge(-1, -3, 7, 10, ELEFANT.ear, ELEFANT.dark, 0.3 + beat * 0.7);
+    oval(-1, -3, 4.5, 7, ELEFANT.inner, 0.3 + beat * 0.7);
+  }
+
+  function drawGiraffe({ beat, dead }) {
+    featherWing(-8, 4, 0.8 + beat, C.wingBack, C.wingEdge);
+    for (const lx of [-10, -2]) fillBox(lx - 2, 13, 4, 9, 2, GIRAFF.fur, GIRAFF.edge);
+    ovalEdge(-5, 9, 11, 8, GIRAFF.fur, GIRAFF.edge);
+    // halsen lutar framåt
+    poly([[-2, 4], [4, 6], [14, -12], [9, -15]], GIRAFF.fur, GIRAFF.edge);
+    for (const [x, y, r] of [[-9, 7, 2.5], [-3, 11, 2.2], [2, 6, 2], [6, -2, 1.8], [10, -8, 1.6], [-12, 11, 1.6]]) blob(x, y, r, GIRAFF.spot);
+    ctx.strokeStyle = GIRAFF.edge; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    seg(9, -15, 0, 3);
+    ovalEdge(14, -17, 7, 5.5, GIRAFF.fur, GIRAFF.edge, 0.2);
+    oval(19, -15, 3.5, 3, GIRAFF.muzzle, 0.2);
+    ctx.strokeStyle = GIRAFF.horn; ctx.lineWidth = 2;
+    seg(11, -21, 10, -26);
+    seg(15, -22, 15, -27);
+    blob(10, -26.5, 1.7, GIRAFF.horn);
+    blob(15, -27.5, 1.7, GIRAFF.horn);
+    dotEye(14, -18.5, dead);
+    featherWing(-8, 4, 0.35 + beat, C.wing, C.wingEdge);
+  }
+
+  function drawCroc({ beat, dead }) {
+    featherWing(-6, 0, 0.8 + beat, KROKO.dark, KROKO.dark);
+    poly([[-10, 2], [-29, 7], [-10, 12]], KROKO.skin, KROKO.dark);
+    for (const x of [-24, -19, -14]) poly([[x, 4.5], [x + 2, 1], [x + 4, 3.6]], KROKO.dark);
+    for (const lx of [-8, 4]) oval(lx, 14, 3.5, 4, KROKO.dark);
+    ovalEdge(-3, 6, 14, 8, KROKO.skin, KROKO.dark);
+    oval(-2, 10, 9, 3.2, KROKO.belly);
+    fillBox(2, -6, 24, 9, 4, KROKO.skin, KROKO.dark);
+    fillBox(4, 0, 21, 5, 2.5, KROKO.belly);
+    for (let x = 8; x < 23; x += 3.5) poly([[x, 0], [x + 1.5, 3], [x + 3, 0]], KROKO.tooth);
+    blob(24, -4, 1, KROKO.dark);
+    ovalEdge(7, -7, 5, 5, KROKO.skin, KROKO.dark);
+    dotEye(7.5, -7.5, dead, 1.8);
+    featherWing(-6, 0, 0.35 + beat, KROKO.belly, KROKO.dark);
+  }
+
+  function drawShark({ beat, dead }) {
+    const flick = dead ? 0 : Math.sin(time * 9) * 4 + beat * 3;
+    poly([[-14, 2], [-27, -9 + flick], [-22, 3], [-27, 13 + flick], [-14, 6]], HAJ.skin, HAJ.dark);
+    poly([[-6, -7], [0, -20], [5, -8]], HAJ.skin, HAJ.dark);
+    ctx.beginPath();
+    ctx.moveTo(-16, 4); ctx.quadraticCurveTo(-8, -10, 10, -8); ctx.quadraticCurveTo(22, -6, 24, 2);
+    ctx.quadraticCurveTo(14, 13, -6, 11); ctx.closePath();
+    ctx.fillStyle = HAJ.skin; ctx.fill();
+    ctx.strokeStyle = HAJ.dark; ctx.lineWidth = 1.5; ctx.stroke();
+    oval(4, 7, 14, 3.6, HAJ.belly);
+    poly([[0, 7], [-4, 16], [6, 9]], HAJ.dark);
+    ctx.strokeStyle = HAJ.gill; ctx.lineWidth = 1.2;
+    seg(7, -4, 6, 2);
+    seg(10, -4, 9, 2);
+    dotEye(15, -3, dead, 1.6);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(12, 4); ctx.quadraticCurveTo(17, 6.5, 22, 3.5); ctx.stroke();
+    for (const x of [13.5, 16.5, 19.3]) poly([[x, 4.6], [x + 1.2, 6.6], [x + 2.4, 4.6]], C.white);
+  }
+
+  function drawDolphin({ beat, dead }) {
+    const flick = dead ? 0 : Math.sin(time * 8) * 4 + beat * 3;
+    poly([[-13, 3], [-25, -6 + flick], [-21, 4], [-25, 13 + flick], [-13, 7]], DELFIN.skin, DELFIN.dark);
+    poly([[-4, -8], [3, -18], [6, -8]], DELFIN.skin, DELFIN.dark);
+    ctx.beginPath();
+    ctx.moveTo(-15, 5); ctx.quadraticCurveTo(-6, -11, 8, -9); ctx.quadraticCurveTo(17, -7, 18, -1);
+    ctx.lineTo(25, 1); ctx.quadraticCurveTo(24, 4, 18, 4); ctx.quadraticCurveTo(8, 13, -6, 11);
+    ctx.closePath();
+    ctx.fillStyle = DELFIN.skin; ctx.fill();
+    ctx.strokeStyle = DELFIN.dark; ctx.lineWidth = 1.5; ctx.stroke();
+    oval(3, 6.5, 11, 3.5, DELFIN.belly);
+    poly([[0, 6], [-5, 14], [5, 9]], DELFIN.dark);
+    dotEye(12, -3, dead, 1.6);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(16, 2.5); ctx.quadraticCurveTo(20, 4.5, 24, 2.2); ctx.stroke();
+  }
+
+  function drawTurtle({ boost, dead }) {
+    // propellern ovanpå skalet
+    ctx.strokeStyle = SKOLD.pole; ctx.lineWidth = 2;
+    seg(-3, -10, -3, -17);
+    const spin = dead ? 1 : Math.cos(time * (boost ? 60 : 35));
+    oval(-3, -18, 12 * Math.abs(spin) + 1, 2.2, SKOLD.prop);
+    blob(-3, -18, 1.8, SKOLD.pole);
+    for (const lx of [-12, 4]) oval(lx, 8, 4, 3, SKOLD.skin);
+    poly([[-16, 3], [-21, 5], [-16, 6]], SKOLD.skin);
+    ovalEdge(14, -1, 6.5, 5.5, SKOLD.skin, SKOLD.skinEdge);
+    dotEye(16, -2.5, dead, 1.5);
+    smile(16, 0, 2, C.ink, 1.1);
+    ctx.beginPath(); ctx.ellipse(-3, 3, 15, 12, 0, Math.PI, Math.PI * 2); ctx.closePath();
+    ctx.fillStyle = SKOLD.shell; ctx.fill();
+    ctx.strokeStyle = SKOLD.edge; ctx.lineWidth = 1.5; ctx.stroke();
+    for (const [x, y, r] of [[-3, -4, 3.6], [-10, -1, 2.6], [4, -1, 2.6], [-7, -8, 2], [1, -8, 2]]) blob(x, y, r, SKOLD.pattern);
+    fillBox(-19, 2, 32, 4, 2, SKOLD.pattern, SKOLD.edge);
+  }
+
+  function drawLadybug({ boost, dead }) {
+    const buzz = dead ? 0 : Math.sin(time * (boost ? 70 : 45)) * 0.45;
+    for (const a of [-0.7, -0.2]) {
+      ctx.save(); ctx.translate(-2, -6); ctx.rotate(a + buzz);
+      ctx.beginPath(); ctx.ellipse(-10, -3, 11, 5.5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = NYCKEL.wing; ctx.fill();
+      ctx.strokeStyle = NYCKEL.wingEdge; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.restore();
+    }
+    ctx.strokeStyle = NYCKEL.black; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    seg(-6, 9, -9, 15);
+    seg(0, 10, -1, 16);
+    seg(6, 9, 8, 15);
+    ovalEdge(13, 1, 7, 6.5, NYCKEL.black, NYCKEL.black);
+    ctx.lineWidth = 1.3;
+    seg(14, -4, 17, -12);
+    seg(11, -4, 10, -12);
+    blob(17, -12.5, 1.6, NYCKEL.black);
+    blob(10, -12.5, 1.6, NYCKEL.black);
+    if (dead) { xEye(13, 0, 1.6, C.white); xEye(17.5, 0.5, 1.6, C.white); } else {
+      blob(13, 0, 2.2, C.white); blob(13.7, 0.3, 1.1, C.ink);
+      blob(17.5, 0.5, 2, C.white); blob(18.1, 0.8, 1, C.ink);
+    }
+    ovalEdge(-1, 2, 14, 11, NYCKEL.red, NYCKEL.dark);
+    oval(-4, -3, 5, 2.5, 'rgba(255,255,255,0.35)', -0.3);
+    for (const [x, y, r] of [[-8, 0, 2.6], [2, -3, 2.4], [-3, 7, 2.6], [7, 5, 2.2], [-11, 7, 1.8]]) blob(x, y, r, NYCKEL.black);
+  }
+
+  function drawParrot({ beat, dead }) {
+    colorWing(-6, 2, 0.8 + beat, PAPEG.wings, PAPEG.wingEdge, 0.9);
+    poly([[-10, 8], [-27, 15], [-25, 19], [-8, 12]], PAPEG.wings[0], PAPEG.wingEdge);
+    poly([[-10, 10], [-24, 21], [-20, 23], [-8, 13]], PAPEG.wings[1], PAPEG.wingEdge);
+    ovalEdge(-2, 6, 11, 11, PAPEG.red, PAPEG.dark);
+    ovalEdge(6, -7, 9, 9, PAPEG.red, PAPEG.dark);
+    oval(9, -6, 4.5, 4, C.white);
+    poly([[12, -9], [20, -5], [17, 1], [12, -2]], PAPEG.beak, PAPEG.beakDark);
+    dotEye(9, -8, dead, 1.5);
+    colorWing(-6, 2, 0.35 + beat, PAPEG.wings, PAPEG.wingEdge, 0.9);
+  }
+
+  function drawFlamingo({ beat, dead }) {
+    featherWing(-6, 2, 0.8 + beat, FLAM.dark, FLAM.dark);
+    ctx.strokeStyle = FLAM.dark; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    seg(-6, 10, -22, 14);
+    seg(-4, 11, -20, 18);
+    ovalEdge(-4, 5, 12, 8, FLAM.pink, FLAM.dark);
+    ctx.strokeStyle = FLAM.pink; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(4, 0); ctx.bezierCurveTo(14, -2, 2, -14, 10, -18); ctx.stroke();
+    ovalEdge(11, -19, 5, 4.5, FLAM.pink, FLAM.dark);
+    poly([[14, -20], [21, -17], [19, -13], [15, -16]], FLAM.beakBase);
+    poly([[18, -18.2], [21, -17], [19, -13], [17.5, -15]], FLAM.beak);
+    dotEye(11.5, -20, dead, 1.3);
+    featherWing(-6, 2, 0.35 + beat, FLAM.light, FLAM.dark);
+  }
+
+  function drawTiger({ beat, dead }) {
+    featherWing(-8, 2, 0.8 + beat, C.wingBack, C.wingEdge);
+    ctx.strokeStyle = TIGER.fur; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-14, 10); ctx.bezierCurveTo(-26, 8, -25, -4, -19, -7); ctx.stroke();
+    ctx.strokeStyle = TIGER.stripe; ctx.lineWidth = 2;
+    seg(-23, 4, -26, 5);
+    seg(-23, -2, -26, -2);
+    for (const lx of [-10, 2]) { oval(lx, 19, 4, 4.5, TIGER.fur); oval(lx, 22, 4, 2, TIGER.white); }
+    ovalEdge(-4, 10, 12.5, 9.5, TIGER.fur, TIGER.dark);
+    oval(-1, 13, 7, 5.5, TIGER.white);
+    ctx.strokeStyle = TIGER.stripe; ctx.lineWidth = 2.2;
+    seg(-12, 4, -9, 8);
+    seg(-8, 2, -6, 6);
+    seg(-15, 10, -11, 12);
+    for (const [x, y] of [[-4, -14], [10, -15]]) { ovalEdge(x, y, 4, 4, TIGER.fur, TIGER.dark); oval(x, y, 2, 2, TIGER.nose); }
+    ovalEdge(3, -4, 12.5, 11, TIGER.fur, TIGER.dark);
+    oval(9, 1, 7, 5, TIGER.white);
+    ctx.strokeStyle = TIGER.stripe; ctx.lineWidth = 2;
+    seg(1, -15, 2, -11);
+    seg(5, -15.5, 5, -11.5);
+    seg(-8, -6, -5, -5);
+    seg(-8, -2, -5, -2);
+    frontEye(3, -6, dead);
+    frontEye(11, -6, dead);
+    poly([[9, -1], [13, -1], [11, 1.5]], TIGER.nose);
+    smile(11, 1.5, 2.2, C.ink, 1.2);
+    featherWing(-8, 2, 0.35 + beat, C.wing, C.wingEdge);
+  }
+
+  function drawKoala({ beat, dead }) {
+    // eukalyptusblad som vingar
+    const leaf = (angle, color) => {
+      ctx.save(); ctx.translate(-6, 0); ctx.rotate(angle);
+      ctx.beginPath(); ctx.ellipse(-12, -2, 13, 5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.strokeStyle = KOALA.leafDark; ctx.lineWidth = 1.3; ctx.stroke();
+      seg(0, 0, -24, -3);
+      ctx.restore();
+    };
+    leaf(0.8 + beat, KOALA.leafDark);
+    oval(-9, 18, 4, 4, KOALA.fur);
+    oval(2, 18.5, 4, 4, KOALA.fur);
+    ovalEdge(-3, 9, 12, 10, KOALA.fur, KOALA.dark);
+    oval(0, 12, 6.5, 6, KOALA.light);
+    for (const x of [-8, 13]) { ovalEdge(x, -12, 7, 7, KOALA.fur, KOALA.dark); oval(x, -12, 4.5, 4.5, KOALA.light); }
+    ovalEdge(3, -4, 12, 10.5, KOALA.fur, KOALA.dark);
+    oval(10, -1, 3.5, 5, KOALA.nose);
+    dotEye(4, -7, dead, 1.6);
+    dotEye(14, -7, dead, 1.6);
+    leaf(0.35 + beat, KOALA.leaf);
+  }
+
+  function drawHedgehog({ beat, dead }) {
+    featherWing(-6, 4, 0.8 + beat, C.wingBack, C.wingEdge);
+    oval(-6, 16, 3.5, 3, IGEL.faceEdge);
+    oval(4, 16.5, 3.5, 3, IGEL.faceEdge);
+    ovalEdge(-2, 4, 14, 12, IGEL.spike, IGEL.spikeDark);
+    // taggarna över ryggen
+    const pts = [];
+    for (let k = 0; k <= 16; k++) {
+      const a = -Math.PI / 3 - k * (Math.PI * 1.15 / 16), r = k % 2 ? 21 : 14;
+      pts.push([-2 + Math.cos(a) * r, 4 + Math.sin(a) * r]);
+    }
+    poly(pts, IGEL.spike, IGEL.spikeDark);
+    oval(2, 10, 6, 4, IGEL.belly);
+    ovalEdge(9, 4, 9, 8, IGEL.face, IGEL.faceEdge);
+    poly([[12, 1], [22, 4], [13, 9]], IGEL.face);
+    blob(22, 4, 2, IGEL.nose);
+    frontEye(10, 1, dead);
+    featherWing(-6, 4, 0.35 + beat, C.wing, C.wingEdge);
+  }
+
+  function drawMoose({ beat, dead }) {
+    featherWing(-8, 2, 0.8 + beat, C.wingBack, C.wingEdge);
+    for (const lx of [-10, 1]) fillBox(lx - 2.5, 12, 5, 10, 2, ALG.fur, ALG.dark);
+    ovalEdge(-4, 7, 13, 9, ALG.fur, ALG.dark);
+    // skovlarna
+    poly([[1, -11], [-6, -18], [-10, -25], [-6, -22], [-4, -27], [-1, -21], [2, -26], [4, -15]], ALG.antler, ALG.antlerEdge);
+    poly([[9, -12], [11, -22], [13, -28], [15, -22], [19, -26], [18, -17], [13, -11]], ALG.antler, ALG.antlerEdge);
+    poly([[0, -9], [-5, -12], [-1, -6]], ALG.fur, ALG.dark);
+    ovalEdge(6, -5, 8, 8, ALG.fur, ALG.dark);
+    ovalEdge(14, -1, 7, 5.5, ALG.muzzle, ALG.dark, 0.2);
+    blob(19, -1, 1, ALG.dark);
+    frontEye(8, -7, dead);
+    // halsduk i blått och gult
+    fillBox(-2, -1, 13, 4, 2, ALG.blue);
+    ctx.fillStyle = ALG.yellow; ctx.fillRect(-1, 0.5, 11, 1.2);
+    poly([[-1, 1], [-6, 9], [-2, 10], [2, 2]], ALG.blue);
+    featherWing(-8, 2, 0.35 + beat, C.wing, C.wingEdge);
+  }
+
+  function drawChick({ beat, dead }) {
+    colorWing(-7, 5, 0.8 + beat * 1.4, [KYCK.dark, KYCK.dark, KYCK.dark], KYCK.dark, 0.7);
+    ovalEdge(1, 1, 14, 14, KYCK.yellow, KYCK.dark);
+    poly([[-1, -13], [1, -19], [3, -13]], KYCK.yellow, KYCK.dark);
+    poly([[2, -13], [6, -18], [6, -12]], KYCK.yellow, KYCK.dark);
+    // äggskalet hon kläcktes ur
+    ctx.beginPath();
+    ctx.moveTo(-13.5, 6);
+    [[-9, 3], [-5, 7], [-1, 3], [3, 7], [7, 3], [11, 7], [14.5, 4]].forEach(([x, y]) => ctx.lineTo(x, y));
+    ctx.lineTo(14.5, 10); ctx.quadraticCurveTo(0.5, 23, -13.5, 10); ctx.closePath();
+    ctx.fillStyle = KYCK.shell; ctx.fill();
+    ctx.strokeStyle = KYCK.shellEdge; ctx.lineWidth = 1.5; ctx.stroke();
+    frontEye(4, -4, dead);
+    frontEye(11, -4, dead);
+    poly([[9, 0], [16, 1.5], [9, 3.5]], KYCK.beak);
+    oval(2, 1, 2, 1.3, KYCK.cheek);
+    colorWing(-7, 5, 0.35 + beat * 1.4, [KYCK.yellow, KYCK.yellow, KYCK.yellow], KYCK.dark, 0.7);
+  }
+
+  function drawBat({ beat, dead }) {
+    leatherWing(-4, 0, 0.75 + beat, FLADDER.dark, FLADDER.dark);
+    ctx.strokeStyle = FLADDER.dark; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+    seg(-3, 15, -5, 19);
+    seg(2, 15, 2, 19);
+    ovalEdge(-1, 6, 9, 10, FLADDER.body, FLADDER.dark);
+    poly([[-4, -10], [-6, -22], [1, -13]], FLADDER.body, FLADDER.dark);
+    poly([[-3.5, -12], [-4.8, -19], [0, -13.5]], FLADDER.inner);
+    poly([[5, -12], [10, -22], [11, -9]], FLADDER.body, FLADDER.dark);
+    poly([[6.5, -12], [9.5, -19], [10, -10.5]], FLADDER.inner);
+    ovalEdge(3, -5, 9.5, 8.5, FLADDER.body, FLADDER.dark);
+    frontEye(2, -6, dead);
+    frontEye(8, -6, dead);
+    blob(6, -1, 1.3, FLADDER.dark);
+    poly([[4, 1.5], [5, 4.5], [6, 1.5]], FLADDER.fang);
+    poly([[7, 1.5], [8, 4.5], [9, 1.5]], FLADDER.fang);
+    leatherWing(-4, 0, 0.3 + beat, FLADDER.wing, FLADDER.dark);
+  }
+
+  function drawPirate({ boost, dead }) {
+    // tunnan han rider på, med en eldsvans bakåt
+    if (!dead) {
+      const f = boost ? 1.4 : 0.8 + Math.sin(time * 30) * 0.15;
+      poly([[-14, 10], [-14 - 12 * f, 14], [-14, 18]], PIRAT.flame);
+      poly([[-14, 12], [-14 - 6 * f, 14], [-14, 16]], PIRAT.core);
+    }
+    fillBox(-14, 8, 26, 12, 5, PIRAT.barrel, PIRAT.barrelDark);
+    ctx.fillStyle = PIRAT.band;
+    ctx.fillRect(-8, 8.5, 2.5, 11);
+    ctx.fillRect(4, 8.5, 2.5, 11);
+    fillBox(-1, 5, 5, 11, 2, PIRAT.pants);
+    fillBox(-6, -6, 14, 13, 4, PIRAT.shirt, '#c9c9d6');
+    ctx.fillStyle = PIRAT.stripe;
+    for (const y of [-3, 1]) ctx.fillRect(-5.5, y, 13, 2);
+    oval(10, -1, 5, 2.2, PIRAT.skin);
+    blob(14.5, -1.5, 2.2, PIRAT.skin);
+    ovalEdge(2, -14, 7.5, 7.5, PIRAT.skin, PIRAT.skinEdge);
+    oval(3, -9, 6, 3.2, PIRAT.beard);
+    ctx.beginPath(); ctx.ellipse(1.5, -18, 8, 4.5, 0, Math.PI, Math.PI * 2); ctx.closePath();
+    ctx.fillStyle = PIRAT.bandana; ctx.fill();
+    poly([[-6, -17], [-12, -13], [-9, -19]], PIRAT.bandana);
+    ctx.strokeStyle = PIRAT.patch; ctx.lineWidth = 1;
+    seg(-4, -18, 9, -12);
+    blob(6, -15, 2.3, PIRAT.patch);
+    dotEye(0.5, -15, dead, 1.3);
+    smile(3, -11.5, 2, C.ink, 1.1);
+  }
+
+  function drawNinja({ boost, dead }) {
+    const wave = dead ? 0 : Math.sin(time * (boost ? 22 : 12));
+    // pannbandets snibbar fladdrar bakåt
+    ctx.strokeStyle = NINJA.band; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-3, -14); ctx.quadraticCurveTo(-14, -16 + wave * 3, -24, -12 + wave * 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-3, -12); ctx.quadraticCurveTo(-13, -9 - wave * 3, -22, -6 - wave * 2); ctx.stroke();
+    oval(-16, 11, 7.5, 3.2, NINJA.dark);
+    oval(-15, 7, 7.5, 3.2, NINJA.suit);
+    ovalEdge(-4, 6, 12, 7.5, NINJA.suit, NINJA.dark);
+    fillBox(-7, 5, 4, 6, 1.5, NINJA.band);
+    oval(11, 1, 7, 3, NINJA.suit);
+    blob(18, 0, 3.2, NINJA.suit);
+    ovalEdge(4, -9, 9, 9, NINJA.suit, NINJA.dark);
+    fillBox(-1, -12.5, 14, 5, 2.5, NINJA.skin);
+    if (dead) { xEye(3, -10, 1.6); xEye(9, -10, 1.6); } else {
+      blob(3, -10, 1.3, C.ink);
+      blob(9, -10, 1.3, C.ink);
+    }
+    fillBox(-5, -16, 17, 3, 1.5, NINJA.band);
+  }
+
+  function drawKnight({ beat, dead }) {
+    featherWing(-8, 2, 0.8 + beat, C.wingBack, C.wingEdge);
+    for (const lx of [-9, -1]) fillBox(lx, 12, 5, 9, 2, RIDDARE.metal, RIDDARE.dark);
+    ovalEdge(-3, 6, 11, 10, RIDDARE.metal, RIDDARE.dark);
+    oval(-6, 3, 3, 6, RIDDARE.shine);
+    oval(-3, -20, 8, 3.5, RIDDARE.plume, -0.4);
+    ovalEdge(3, -9, 9, 9.5, RIDDARE.metal, RIDDARE.dark);
+    oval(0, -13, 2.5, 3.5, RIDDARE.shine, -0.3);
+    fillBox(4, -12, 9, 6, 2, RIDDARE.dark);
+    if (dead) xEye(8.5, -9, 1.7, C.white);
+    else { ctx.fillStyle = C.ink; ctx.fillRect(6, -10, 6, 1.4); }
+    ovalEdge(10, 6, 6, 7.5, RIDDARE.shield, RIDDARE.shieldEdge);
+    ctx.fillStyle = RIDDARE.cross;
+    ctx.fillRect(9, 1, 2, 10);
+    ctx.fillRect(6, 4.5, 8, 2);
+    featherWing(-8, 2, 0.35 + beat, C.wing, C.wingEdge);
+  }
+
+  function drawWizard({ boost, dead }) {
+    const wave = dead ? 0 : Math.sin(time * (boost ? 18 : 9)) * 3;
+    ctx.beginPath();
+    ctx.moveTo(-4, -4); ctx.quadraticCurveTo(-18, 2 + wave, -24, 14 + wave); ctx.lineTo(8, 16);
+    ctx.quadraticCurveTo(10, 4, 6, -4); ctx.closePath();
+    ctx.fillStyle = TROLL.robe; ctx.fill();
+    ctx.strokeStyle = TROLL.dark; ctx.lineWidth = 1.5; ctx.stroke();
+    star(-8, 8, 2.6, TROLL.star);
+    star(0, 12, 2, TROLL.star);
+    star(-15, 12, 1.8, TROLL.star);
+    // staven med en lysande kula
+    ctx.strokeStyle = TROLL.staff; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    seg(12, 14, 18, -12);
+    ctx.globalAlpha = dead ? 0.2 : 0.35 + 0.15 * Math.sin(time * 5);
+    blob(18.5, -14, 6, TROLL.orb);
+    ctx.globalAlpha = 1;
+    blob(18.5, -14, 3, C.white);
+    blob(14, 2, 2.6, TROLL.skin);
+    ovalEdge(3, -8, 7.5, 7.5, TROLL.skin, TROLL.skinEdge);
+    poly([[-3, -6], [9, -6], [5, 7], [1, 9]], TROLL.beard, TROLL.beardEdge);
+    dotEye(1.5, -9, dead, 1.2);
+    dotEye(6, -9, dead, 1.2);
+    poly([[-7, -12], [13, -12], [5, -22], [-4, -31], [-1, -21]], TROLL.robe, TROLL.dark);
+    fillBox(-9, -14, 23, 3.5, 1.7, TROLL.dark);
+    star(3, -18, 2.4, TROLL.star);
+    if (boost && !dead) for (const [x, y] of [[22, -20], [25, -10]]) star(x, y, 1.8, TROLL.star);
+  }
+
+  function drawWitch({ dead }) {
+    // kvasten med riset bakåt
+    ctx.strokeStyle = HAXA.broom; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    seg(-14, 12, 22, 8);
+    poly([[-14, 9], [-28, 4], [-30, 12], [-27, 20], [-14, 15]], HAXA.bristle, HAXA.bristleEdge);
+    fillBox(-15, 9, 3, 7, 1, HAXA.band);
+    ctx.beginPath();
+    ctx.moveTo(-6, -2); ctx.lineTo(6, -2); ctx.lineTo(10, 12); ctx.quadraticCurveTo(0, 15, -10, 12); ctx.closePath();
+    ctx.fillStyle = HAXA.dress; ctx.fill();
+    ctx.strokeStyle = HAXA.dark; ctx.lineWidth = 1.5; ctx.stroke();
+    oval(7, 15, 4, 2.5, HAXA.dark);
+    oval(9, 4, 5, 2.2, HAXA.dress, 0.5);
+    blob(12, 8, 2.3, HAXA.skin);
+    oval(-4, -8, 6, 8, HAXA.hair, 0.3);
+    poly([[-4, -12], [-14, -6], [-8, -2]], HAXA.hair);
+    ovalEdge(2, -10, 7, 7, HAXA.skin, HAXA.skinEdge);
+    poly([[7, -11], [11, -8], [7, -8]], HAXA.skin, HAXA.skinEdge, 1);
+    dotEye(1.5, -11, dead, 1.2);
+    dotEye(5, -11, dead, 1.2);
+    smile(3.5, -8, 2, C.ink, 1.1);
+    oval(1, -16, 11, 2.6, HAXA.hat);
+    poly([[-5, -16], [8, -16], [3, -24], [-6, -31], [-2, -23]], HAXA.hat);
+    ctx.fillStyle = HAXA.band; ctx.fillRect(-4.5, -19, 12, 2);
+  }
+
+  function drawMermaid({ beat, dead }) {
+    const f = dead ? 0 : (Math.sin(time * 8) * 5 + beat * 4) * 0.4;
+    oval(-6, -8, 6, 10, SJOJ.hairDark, 0.6);
+    poly([[-3, -14], [-16, -10 + f], [-10, -2]], SJOJ.hair);
+    ctx.beginPath();
+    ctx.moveTo(-4, 0); ctx.quadraticCurveTo(-12, 4, -18, 8 + f); ctx.lineTo(-16, 13 + f);
+    ctx.quadraticCurveTo(-8, 12, 4, 8); ctx.closePath();
+    ctx.fillStyle = SJOJ.tail; ctx.fill();
+    ctx.strokeStyle = SJOJ.tailDark; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = SJOJ.scale; ctx.lineWidth = 1.2;
+    for (const [x, y] of [[-2, 5], [-7, 6], [-12, 8.5]]) { ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI); ctx.stroke(); }
+    poly([[-17, 9 + f], [-27, 2 + f * 1.5], [-24, 11 + f], [-27, 19 + f * 1.5], [-16, 13 + f]], SJOJ.fin, SJOJ.tailDark);
+    oval(2, -2, 5, 6, SJOJ.skin);
+    ovalEdge(0.5, -3, 2.5, 2, SJOJ.top, SJOJ.topEdge);
+    ovalEdge(4.5, -3, 2.5, 2, SJOJ.top, SJOJ.topEdge);
+    oval(8, 0, 5, 2, SJOJ.skin, -0.3);
+    ovalEdge(3, -12, 7, 7, SJOJ.skin, SJOJ.skinEdge);
+    oval(0, -17, 7, 3.5, SJOJ.hair);
+    oval(-3, -12, 3, 6, SJOJ.hair);
+    dotEye(4, -12.5, dead, 1.2);
+    dotEye(8, -12.5, dead, 1.2);
+    oval(3, -9.5, 1.5, 0.9, '#ff9eb8');
+    smile(6, -10, 1.8, C.ink, 1.1);
+    if (!dead) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1;
+      for (const [x, y, r] of [[16, -16, 2], [20, -21, 1.4]]) { ctx.beginPath(); ctx.arc(x, y - (time * 6) % 4, r, 0, Math.PI * 2); ctx.stroke(); }
+    }
+  }
+
+  function drawSnowman({ beat, dead }) {
+    // pinnarmarna flaxar som vingar
+    const a = beat * 0.9;
+    ctx.strokeStyle = SNO.stick; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    seg(-8, 2, -22, -6 - a * 10);
+    seg(-17, -3 - a * 6, -20, -10 - a * 8);
+    seg(10, 1, 22, -4 - a * 6);
+    ovalEdge(-1, 10, 13, 11, SNO.snow, SNO.edge);
+    blob(2, 6, 1.5, SNO.coal);
+    blob(3, 11, 1.5, SNO.coal);
+    ovalEdge(2, -8, 9, 8.5, SNO.snow, SNO.edge);
+    fillBox(-6, -2, 16, 4, 2, SNO.scarf);
+    poly([[-4, 0], [-9, 9], [-5, 10], [-1, 2]], SNO.scarf, SNO.scarfDark, 1);
+    if (dead) { xEye(1, -10, 1.6); xEye(6, -10, 1.6); } else {
+      blob(1, -10, 1.5, SNO.coal);
+      blob(6, -10, 1.5, SNO.coal);
+    }
+    poly([[6, -7], [17, -5], [6, -4.5]], SNO.carrot);
+    for (const x of [0, 2.5, 5]) blob(x, -3.8 + Math.abs(x - 2.5) * -0.3, 0.7, SNO.coal);
+    fillBox(-5, -24, 13, 9, 1.5, SNO.hat);
+    fillBox(-8, -16, 19, 3, 1.5, SNO.hat);
+    ctx.fillStyle = SNO.band; ctx.fillRect(-5, -18.5, 13, 2);
+    if (!dead) for (const [x, y, k] of [[-18, 14, 0], [18, 12, 2]]) star(x, y, 1.6 + 0.6 * Math.sin(time * 4 + k), SNO.snow);
+  }
+
   function drawPanda({ boost, dead }) {
     if (!dead) {
       for (let k = 1; k <= 3; k++) {
@@ -3935,37 +4516,60 @@
   const FIG_COLS = 5, FIG_W = 62, FIG_H = 54, FIG_GAP = 4;
   const FIG_X = FIG_PANEL.x + (FIG_PANEL.w - (FIG_COLS * FIG_W + (FIG_COLS - 1) * FIG_GAP)) / 2;
 
-  // Samlingens två delar med rubrik och rutnät; rutorna räknas fram varje gång,
-  // så att ritning och tryck alltid stämmer med varandra.
+  // Samlingens två delar med rubrik och rutnät, uppdelade på sidor när de inte får
+  // plats; pilarna längst ner bläddrar. Rutorna räknas fram varje gång, så att
+  // ritning och tryck alltid stämmer med varandra.
+  let figPage = 0;
+  const FIG_TOP = FIG_PANEL.y + 76, FIG_BOTTOM = FIG_CLOSE.y - 26;
+  const FIG_PREV = { x: FIG_PANEL.x + 14, y: FIG_CLOSE.y, w: 44, h: 44 };
+  const FIG_NEXT = { x: FIG_PANEL.x + FIG_PANEL.w - 58, y: FIG_CLOSE.y, w: 44, h: 44 };
   function figureLayout() {
     // första gången är de tre startfigurerna valbara; sedan de egna
     const owned = PICKER.filter(isUnlocked);
     const missing = PICKER.filter(ci => !owned.includes(ci) && !CHARACTERS[ci].gift);
-    const sections = [], cells = [];
-    let y = FIG_PANEL.y + 76;
     const firstTitle = choosingFirst() ? 'Välj din första figur' : `Dina figurer (${owned.length})`;
     const parts = [[firstTitle, owned, true]];
     // har man alla figurer behövs ingen rad för dem som är kvar
     if (missing.length || choosingFirst()) parts.push([`Kvar att få (${missing.length})`, missing, false]);
+
+    // rubriker och rader läggs ut sida för sida; en del som fortsätter på nästa sida får sin rubrik igen
+    const pages = [{ sections: [], cells: [] }];
+    let y = FIG_TOP;
+    const newPage = () => { pages.push({ sections: [], cells: [] }); y = FIG_TOP; };
+    const ROW = FIG_H + FIG_GAP;
     for (const [title, list, mine] of parts) {
-      sections.push({ title, y });
+      if (y + 20 + ROW > FIG_BOTTOM) newPage();
+      pages[pages.length - 1].sections.push({ title, y });
       y += 20;
-      list.forEach((ci, k) => cells.push({
-        ci, mine,
-        x: FIG_X + (k % FIG_COLS) * (FIG_W + FIG_GAP),
-        y: y + Math.floor(k / FIG_COLS) * (FIG_H + FIG_GAP), w: FIG_W, h: FIG_H,
-      }));
-      y += Math.max(1, Math.ceil(list.length / FIG_COLS)) * (FIG_H + FIG_GAP) + 6;
+      const rows = Math.max(1, Math.ceil(list.length / FIG_COLS));
+      for (let r = 0; r < rows; r++) {
+        if (y + ROW > FIG_BOTTOM) { newPage(); pages[pages.length - 1].sections.push({ title, y }); y += 20; }
+        list.slice(r * FIG_COLS, (r + 1) * FIG_COLS).forEach((ci, k) => pages[pages.length - 1].cells.push({
+          ci, mine, x: FIG_X + k * (FIG_W + FIG_GAP), y, w: FIG_W, h: FIG_H,
+        }));
+        y += ROW;
+      }
+      y += 6;
     }
-    return { sections, cells, empty: !owned.length };
+    figPage = Math.min(figPage, pages.length - 1);
+    return { ...pages[figPage], pageCount: pages.length, empty: !owned.length };
+  }
+
+  function drawPageArrow(b, dir, enabled) {
+    rr(b.x, b.y, b.w, b.h, b.h / 2);
+    ctx.fillStyle = enabled ? C.banana : C.locked; ctx.fill();
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.stroke();
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    poly([[cx - 5 * dir, cy - 8], [cx + 7 * dir, cy], [cx - 5 * dir, cy + 8]], enabled ? C.ink : 'rgba(29,43,31,0.35)');
   }
 
   function drawFigures() {
-    const P = FIG_PANEL, { sections, cells, empty } = figureLayout();
+    const P = FIG_PANEL, { sections, cells, pageCount } = figureLayout();
     dim();
     drawPanel(P, 'Figurer');
     const total = CHARACTERS.filter(c => !c.gift || unlocked.has(c.id)).length;
-    const coinsLine = `${choosingFirst() ? 0 : unlocked.size} av ${total} figurer · ${blueCoins} blå mynt`;
+    const pageText = pageCount > 1 ? ` · sida ${figPage + 1} av ${pageCount}` : '';
+    const coinsLine = `${choosingFirst() ? 0 : unlocked.size} av ${total} figurer · ${blueCoins} blå mynt${pageText}`;
     say(coinsLine, W / 2 + 9, P.y + 58, 13, { font: BODY, weight: '800', fill: C.dirt, stroke: null });
     ctx.font = `800 13px ${BODY}`;
     drawItem(BLUE, W / 2 + 9 - ctx.measureText(coinsLine).width / 2 - 12, P.y + 58, 0.6);
@@ -3996,6 +4600,16 @@
       : 'Tryck på en låst figur för att köpa den; priset står i hörnet';
     say(note, W / 2, FIG_CLOSE.y - 14, 12, { font: BODY, weight: '800', fill: C.dirt, stroke: null });
     drawCloseButton(FIG_CLOSE);
+    if (pageCount > 1) {
+      drawPageArrow(FIG_PREV, -1, figPage > 0);
+      drawPageArrow(FIG_NEXT, 1, figPage < pageCount - 1);
+    }
+  }
+
+  function turnFigPage(step) {
+    const { pageCount } = figureLayout();
+    const next = Math.max(0, Math.min(pageCount - 1, figPage + step));
+    if (next !== figPage) { figPage = next; sfx.click(); }
   }
 
   // Priset i blå mynt i hörnet på en låst figur, med högerkanten vid `right`;
@@ -4011,7 +4625,10 @@
   }
 
   function tapFigures(p) {
-    const cell = figureLayout().cells.find(c => inside(p, c));
+    const { cells, pageCount } = figureLayout();
+    if (pageCount > 1 && inside(p, FIG_PREV)) return turnFigPage(-1);
+    if (pageCount > 1 && inside(p, FIG_NEXT)) return turnFigPage(1);
+    const cell = cells.find(c => inside(p, c));
     if (cell) {
       if (cell.mine) pickFigure(cell.ci);
       else if (choosingFirst()) { startMsg = { text: 'Välj din första figur först', at: time }; sfx.click(); }
@@ -4272,6 +4889,11 @@
     if (e.code === 'KeyN') { e.preventDefault(); sfx.toggleMusic(); return; }
     if (overlay === 'scores') {
       if (['Escape', 'KeyT', 'Enter', 'Space'].includes(e.code)) { e.preventDefault(); closeOverlay(); }
+      return;
+    }
+    if (overlay === 'figures' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) {
+      e.preventDefault();
+      turnFigPage(e.code === 'ArrowLeft' ? -1 : 1);
       return;
     }
     if (overlay === 'settings' || overlay === 'figures') {
