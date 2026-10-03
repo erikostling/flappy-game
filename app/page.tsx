@@ -1,4 +1,14 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import Script from 'next/script';
+
+// Adressen till spelet bär en hash av filen, räknad när sidan byggs. Ändras spelet
+// ändras adressen, så att ingen webbläsare kör en gammal version ur sin cache.
+const GAME_VERSION = createHash('sha256')
+  .update(readFileSync(join(process.cwd(), 'public', 'game.js')))
+  .digest('hex')
+  .slice(0, 12);
 
 // Hela spelet ritas på canvasen av public/game.js; sidan ger bara canvasen och
 // rutan där man skriver sitt namn på topplistan.
@@ -34,7 +44,7 @@ export default function Home() {
         </form>
       </div>
       <div className="safe" id="safe" aria-hidden="true" />
-      <Script src="/game.js" strategy="afterInteractive" />
+      <Script src={`/game.js?v=${GAME_VERSION}`} strategy="afterInteractive" />
     </main>
   );
 }
