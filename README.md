@@ -45,7 +45,7 @@ Ett namn hör till den enhet som tog det först:
 - Med ett namn som hör till någon annan svarar `POST` 409.
 - Namn från innan nycklarna fanns tas av den enhet som har namnet sparat hos sig, när spelet startar där.
 
-Guldpersonen är en gåva till Wilhelm. Den går inte att köpa och syns bara på enheten som äger namnet Wilhelm.
+Guldkungen är en gåva till Wilhelm. Den går inte att köpa och syns bara på enheten som äger namnet Wilhelm. Guldpersonen kan alla köpa, för 25 blå mynt.
 
 I Supabase (projektet "Flappy game"):
 - Tabellen `scores` får alla läsa.
