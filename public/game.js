@@ -443,14 +443,30 @@
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
 
+  // Spelet mäts i W×H och skalas så att det får plats, med marken mot skärmens
+  // underkant. Det som blir över fylls av mer värld: himmel ovanför och mer åt
+  // sidorna. VX0–VX1 och VY0–H är det som syns. MID flyttar rutor och startskärm
+  // till mitten av det som syns. UI_* är skärmens kanter innanför notch och
+  // hemknapp, som läses från #safe.
+  let VX0 = 0, VX1 = W, VY0 = 0, VW = W, VH = H, MID = 0;
+  let UI_T = 0, UI_B = H, UI_L = 0, UI_R = W;
+  const safe = document.getElementById('safe');
   function fit() {
     const dpr = window.devicePixelRatio || 1;
-    const s = Math.max(0.2, Math.min(stage.clientWidth / W, stage.clientHeight / H));
-    canvas.style.width = Math.floor(W * s) + 'px';
-    canvas.style.height = Math.floor(H * s) + 'px';
-    canvas.width = Math.round(W * s * dpr);
-    canvas.height = Math.round(H * s * dpr);
-    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+    const cw = Math.max(1, Math.floor(stage.clientWidth)), ch = Math.max(1, Math.floor(stage.clientHeight));
+    const s = Math.max(0.2, Math.min(cw / W, ch / H));
+    canvas.style.width = cw + 'px';
+    canvas.style.height = ch + 'px';
+    canvas.width = Math.round(cw * dpr);
+    canvas.height = Math.round(ch * dpr);
+    const ox = (cw - W * s) / 2, oy = ch - H * s;
+    ctx.setTransform(s * dpr, 0, 0, s * dpr, ox * dpr, oy * dpr);
+    VX0 = -ox / s; VX1 = W + ox / s; VY0 = -oy / s;
+    VW = VX1 - VX0; VH = H - VY0; MID = VY0 / 2;
+    const inset = safe ? getComputedStyle(safe) : null;
+    const edge = side => (inset ? parseFloat(inset[side]) || 0 : 0) / s;
+    UI_T = VY0 + edge('paddingTop'); UI_B = H - edge('paddingBottom');
+    UI_L = VX0 + edge('paddingLeft'); UI_R = VX1 - edge('paddingRight');
     screen.style.setProperty('--s', s);
   }
   new ResizeObserver(fit).observe(stage);
@@ -1054,7 +1070,7 @@
     const [topEnd, botStart] = gapEnds(p), cx = p.x + PIPE_W / 2;
     return [
       [cx - headW / 2, topEnd - headLen, headW, headLen],
-      [cx - shaftW / 2, -100, shaftW, topEnd - headLen + 100],
+      [cx - shaftW / 2, VY0 - 100, shaftW, topEnd - headLen - VY0 + 100],
       [cx - headW / 2, botStart, headW, headLen],
       [cx - shaftW / 2, botStart + headLen, shaftW, H - GROUND - botStart - headLen],
     ];
@@ -1065,7 +1081,7 @@
     if (ob.hits) return ob.hits(p);
     const { inset = 0, grace = 0 } = ob;
     const [topEnd, botStart] = gapEnds(p), x = p.x + inset, w = PIPE_W - inset * 2;
-    return [[x, -100, w, topEnd - grace + 100], [x, botStart + grace, w, H - GROUND - botStart - grace]];
+    return [[x, VY0 - 100, w, topEnd - grace - VY0 + 100], [x, botStart + grace, w, H - GROUND - botStart - grace]];
   }
 
   function hitsPipe(p) {
@@ -1093,7 +1109,7 @@
 
     player.vy += GRAVITY * dt;
     player.y += player.vy * dt;
-    if (player.y < HIT) { player.y = HIT; player.vy = 0; }
+    if (player.y < VY0 + HIT) { player.y = VY0 + HIT; player.vy = 0; }
 
     const floor = H - GROUND - HIT;
     if (player.y >= floor) {
@@ -1105,10 +1121,10 @@
     if (state !== 'playing') return;
 
     const last = pipes[pipes.length - 1];
-    if (!last || last.x < W + 60 - SPACING) {
+    if (!last || last.x < VX1 + 60 - SPACING) {
       const size = gapSize(), glide = glideSize();
       const pipe = {
-        x: last ? last.x + SPACING : W + 60,
+        x: last ? last.x + SPACING : VX1 + 60,
         gap: nextGap(last?.gap, size, glide), size, glide, swing: Math.random() * 6,
         tint: nextTint(last?.tint),
         seed: Math.floor(Math.random() * 6),
@@ -1132,7 +1148,7 @@
       if (!p.scored && p.x + PIPE_W / 2 < player.x) { p.scored = true; score++; sfx.score(); checkWorld(); checkMedal(); }
       if (hitsPipe(p) && !survives()) { crash(); break; }
     }
-    pipes = pipes.filter(p => p.x + PIPE_W > -20);
+    pipes = pipes.filter(p => p.x + PIPE_W > VX0 - 20);
   }
 
   // Saker och krafter glider med hindren; medan magneten verkar dras de som är nära
@@ -1148,7 +1164,7 @@
       const iy = it.y + Math.sin(time * 3 + it.phase) * 4;
       if (!it.taken && (player.x - it.x) ** 2 + (player.y - iy) ** 2 < (HIT + ITEM_R) ** 2) take(it);
     }
-    return list.filter(it => !it.taken && it.x > -30);
+    return list.filter(it => !it.taken && it.x > VX0 - 30);
   }
 
   // ---------- Namnrutan ----------
@@ -1253,41 +1269,69 @@
   }
 
   // Upprepade lager: element nummer i ligger på i * step + offset.
+  // Något med jämna mellanrum över hela bredden som syns; `i` räknar dem i världen.
   function repeat(offset, step, fn) {
-    const first = Math.floor(-offset / step) - 1;
-    for (let i = first; i * step + offset < W + step; i++) fn(i * step + offset, i);
+    const first = Math.floor((VX0 - offset) / step) - 1;
+    for (let i = first; i * step + offset < VX1 + step; i++) fn(i * step + offset, i);
+  }
+
+  // Kopior av något som ligger vid x0, med `span` mellanrum, över hela bredden som
+  // syns och `pad` utanför. Så täcker moln, stjärnor och snö som är gjorda för W
+  // också en bredare skärm.
+  function spanX(x0, span, pad, fn) {
+    const start = x0 - Math.ceil((x0 - (VX0 - pad)) / span) * span;
+    for (let x = start; x < VX1 + pad; x += span) fn(x);
+  }
+  const tileX = (x0, fn) => spanX(x0, W, 0, fn);
+  // Första k för saker på marken vid off + k * step, så att de börjar utanför vänsterkanten.
+  const stepFrom = (off, step) => Math.floor((VX0 - off) / step) - 1;
+
+  // Fyller hela skärmen oavsett var spelet ligger på den.
+  function fillScreen(color) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = color; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
+
+  // Rutor och startskärmens mitt ritas flyttade till mitten av det som syns.
+  function uiFrame(fn) {
+    ctx.save(); ctx.translate(0, MID); fn(); ctx.restore();
   }
 
   // ---------- Världarna ----------
 
   function drawSky(t) {
-    const g = ctx.createLinearGradient(0, 0, 0, H);
+    const g = ctx.createLinearGradient(0, VY0, 0, H);
     g.addColorStop(0, t.sky[0]); g.addColorStop(1, t.sky[1]);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = g; ctx.fillRect(VX0, VY0, VW, VH);
     t.backdrop();
   }
 
   function drawClouds(color) {
-    const span = W + 140;
     for (const [cx0, cy, s] of [[40, 90, 1], [230, 150, 0.7], [330, 60, 0.85]]) {
-      const cx = (((cx0 - time * 12 * s) % span) + span) % span - 70;
-      blob(cx, cy, 18 * s, color);
-      blob(cx + 20 * s, cy - 10 * s, 22 * s, color);
-      blob(cx + 42 * s, cy, 17 * s, color);
-      ctx.fillRect(cx, cy, 42 * s, 17 * s);
+      spanX(cx0 - time * 12 * s - 70, W + 140, 70, cx => {
+        blob(cx, cy, 18 * s, color);
+        blob(cx + 20 * s, cy - 10 * s, 22 * s, color);
+        blob(cx + 42 * s, cy, 17 * s, color);
+        ctx.fillRect(cx, cy, 42 * s, 17 * s);
+      });
     }
   }
 
   function drawCanopy(offset, baseY, r, step, color) {
     repeat(offset, step, (x, i) => blob(x, baseY - (((i * 7919) % 5) + 5) % 5 * 7, r, color));
-    ctx.fillRect(0, baseY, W, H - baseY);
+    ctx.fillRect(VX0, baseY, VW, H - baseY);
   }
 
   function drawStars(strength = 1) {
+    // stjärnorna upprepas också uppåt när det syns mer himmel
+    const up = H - GROUND - 40;
     for (const s of STARS) {
-      const x = (((s.x + hillX * 0.15) % W) + W) % W;
       ctx.globalAlpha = (0.55 + 0.45 * Math.sin(time * 2 + s.tw)) * strength;
-      blob(x, s.y, s.r, '#ffffff');
+      tileX(s.x + hillX * 0.15, x => {
+        for (let y = s.y; y > VY0 - 4; y -= up) blob(x, y, s.r, '#ffffff');
+      });
     }
     ctx.globalAlpha = 1;
   }
@@ -1297,18 +1341,19 @@
     blob(66, 97, 2.5, '#bdb7d6');
     blob(74, 104, 2, '#bdb7d6');
 
-    const span = W + 160;
-    const x = (((290 + hillX * 0.08) % span) + span) % span - 80, y = 170;
-    ctx.strokeStyle = '#f3e3b8'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.ellipse(x, y, 42, 10, -0.3, Math.PI, Math.PI * 2); ctx.stroke();
-    ctx.save();
-    ctx.beginPath(); ctx.arc(x, y, 24, 0, Math.PI * 2); ctx.clip();
-    ctx.fillStyle = '#f2a65a'; ctx.fillRect(x - 24, y - 24, 48, 48);
-    oval(x, y - 8, 30, 4, '#e08a3c', -0.3);
-    oval(x, y + 6, 30, 3, '#e08a3c', -0.3);
-    ctx.restore();
-    ctx.strokeStyle = '#f3e3b8'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.ellipse(x, y, 42, 10, -0.3, 0, Math.PI); ctx.stroke();
+    const y = 170;
+    spanX(290 + hillX * 0.08 - 80, W + 160, 80, x => {
+      ctx.strokeStyle = '#f3e3b8'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(x, y, 42, 10, -0.3, Math.PI, Math.PI * 2); ctx.stroke();
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, y, 24, 0, Math.PI * 2); ctx.clip();
+      ctx.fillStyle = '#f2a65a'; ctx.fillRect(x - 24, y - 24, 48, 48);
+      oval(x, y - 8, 30, 4, '#e08a3c', -0.3);
+      oval(x, y + 6, 30, 3, '#e08a3c', -0.3);
+      ctx.restore();
+      ctx.strokeStyle = '#f3e3b8'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(x, y, 42, 10, -0.3, 0, Math.PI); ctx.stroke();
+    });
   }
 
   function drawRainbow() {
@@ -1332,7 +1377,7 @@
       poly([[x - 95, base], [x - 20, top], [x + 20, top], [x + 95, base]], '#8a5537');
       poly([[x - 20, top], [x + 20, top], [x + 13, top + 12], [x + 5, top + 26], [x - 4, top + 14], [x - 13, top + 20]], '#ff5e3a');
     });
-    ctx.fillStyle = '#7a4a2e'; ctx.fillRect(0, base, W, H - base);
+    ctx.fillStyle = '#7a4a2e'; ctx.fillRect(VX0, base, VW, H - base);
   }
 
   function drawFerns(offset) {
@@ -1354,14 +1399,14 @@
       ctx.fillRect(x + 12, top + 12, 13, 13);
       ctx.fillRect(x + w - 25, top + 12, 13, 13);
     });
-    ctx.fillStyle = '#9ccf7a'; ctx.fillRect(0, base, W, H - base);
+    ctx.fillStyle = '#9ccf7a'; ctx.fillRect(VX0, base, VW, H - base);
   }
 
   function drawFence(offset) {
     const top = 466, bottom = H - GROUND, white = '#fbf8f1', edge = '#b9b0a0';
     for (const y of [478, 500]) {
-      ctx.fillStyle = white; ctx.fillRect(0, y, W, 6);
-      ctx.strokeStyle = edge; ctx.lineWidth = 1.5; ctx.strokeRect(-2, y, W + 4, 6);
+      ctx.fillStyle = white; ctx.fillRect(VX0, y, VW, 6);
+      ctx.strokeStyle = edge; ctx.lineWidth = 1.5; ctx.strokeRect(VX0 - 2, y, VW + 4, 6);
     }
     repeat(offset, 18, x => {
       poly([[x, bottom], [x, top + 6], [x + 5, top], [x + 10, top + 6], [x + 10, bottom]], white, edge);
@@ -1375,9 +1420,9 @@
       .forEach(([color, y0, width], k) => {
         ctx.strokeStyle = color; ctx.lineWidth = width;
         ctx.beginPath();
-        for (let x = -10; x <= W + 10; x += 10) {
+        for (let x = VX0 - 10; x <= VX1 + 10; x += 10) {
           const y = y0 + Math.sin(x * 0.018 + time * 0.5 + k * 1.7) * 16 + Math.sin(x * 0.045 + time * 0.9) * 5;
-          if (x === -10) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          if (x === VX0 - 10) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.stroke();
       });
@@ -1391,21 +1436,21 @@
       poly([[x - 70, base], [x - 30, base - h * 0.6], [x - 8, base - h], [x + 18, base - h * 0.7], [x + 34, base - h * 0.8], [x + 70, base]], '#d6ebf7');
       poly([[x - 8, base - h], [x + 18, base - h * 0.7], [x + 34, base - h * 0.8], [x + 70, base], [x + 10, base]], '#a9cde6');
     });
-    ctx.fillStyle = '#c4dff0'; ctx.fillRect(0, base, W, H - base);
+    ctx.fillStyle = '#c4dff0'; ctx.fillRect(VX0, base, VW, H - base);
   }
 
   function drawSnow() {
+    const fall = H - GROUND - VY0;
     for (const f of FLAKES) {
-      const y = (f.y + time * f.v) % (H - GROUND);
-      const x = (((f.x + hillX * 0.6 + Math.sin(time + f.p) * 8) % W) + W) % W;
-      blob(x, y, f.r, 'rgba(255,255,255,0.85)');
+      const y = VY0 + (f.y + time * f.v) % fall;
+      tileX(f.x + hillX * 0.6 + Math.sin(time + f.p) * 8, x => blob(x, y, f.r, 'rgba(255,255,255,0.85)'));
     }
   }
 
   function drawRays() {
-    for (let k = 0; k < 4; k++) {
+    for (let k = Math.floor((VX0 - 130) / 110); k * 110 + 20 < VX1 + 20; k++) {
       const x = 20 + k * 110 + Math.sin(time * 0.4 + k) * 20;
-      poly([[x, 0], [x + 40, 0], [x + 110, H - GROUND], [x + 30, H - GROUND]], 'rgba(255,255,255,0.07)');
+      poly([[x, VY0], [x + 40, VY0], [x + 110, H - GROUND], [x + 30, H - GROUND]], 'rgba(255,255,255,0.07)');
     }
   }
 
@@ -1423,12 +1468,13 @@
   }
 
   function drawBubbles() {
-    const span = H - GROUND;
+    const span = H - GROUND - VY0;
     ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1.2;
     for (const b of BUBBLES) {
-      const y = span - ((b.y + time * b.v) % span);
-      const x = (((b.x + hillX * 0.5 + Math.sin(time * 1.5 + b.p) * 5) % W) + W) % W;
-      ctx.beginPath(); ctx.arc(x, y, b.r, 0, Math.PI * 2); ctx.stroke();
+      const y = H - GROUND - ((b.y + time * b.v) % span);
+      tileX(b.x + hillX * 0.5 + Math.sin(time * 1.5 + b.p) * 5, x => {
+        ctx.beginPath(); ctx.arc(x, y, b.r, 0, Math.PI * 2); ctx.stroke();
+      });
     }
   }
 
@@ -1470,7 +1516,7 @@
       const h = 90 + (hash(i) % 4) * 20;
       poly([[x - 100, base], [x, base - h], [x + 100, base]], color);
     });
-    ctx.fillStyle = color; ctx.fillRect(0, base, W, H - base);
+    ctx.fillStyle = color; ctx.fillRect(VX0, base, VW, H - base);
   }
 
   function drawCastles(offset) {
@@ -1504,29 +1550,28 @@
         for (let wx = x + 6; wx < x + bw - 8; wx += 12) ctx.fillRect(wx, wy, 6, 8);
       }
     });
-    ctx.fillStyle = colors[0]; ctx.fillRect(0, base, W, H - base);
+    ctx.fillStyle = colors[0]; ctx.fillRect(VX0, base, VW, H - base);
   }
 
   function drawRoadLines(y) {
-    const step = 60, off = -(travel % step);
     ctx.fillStyle = '#ffd23f';
-    for (let x = off; x < W; x += step) ctx.fillRect(x, y + 48, 30, 4);
+    spanX(-(travel % 60), 60, 60, x => ctx.fillRect(x, y + 48, 30, 4));
   }
 
   function drawBats() {
     ctx.fillStyle = '#0b0614';
     for (let k = 0; k < 3; k++) {
-      const span = W + 60;
-      const x = (((k * 150 - time * (25 + k * 8)) % span) + span) % span - 30;
       const y = 95 + k * 45 + Math.sin(time * 2 + k) * 12;
       const f = Math.sin(time * 14 + k) * 5;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.quadraticCurveTo(x - 7, y - 6 - f, x - 14, y - f);
-      ctx.quadraticCurveTo(x - 8, y - 1, x, y + 3);
-      ctx.quadraticCurveTo(x + 8, y - 1, x + 14, y - f);
-      ctx.quadraticCurveTo(x + 7, y - 6 - f, x, y);
-      ctx.fill();
+      spanX(k * 150 - time * (25 + k * 8) - 30, W + 60, 30, x => {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x - 7, y - 6 - f, x - 14, y - f);
+        ctx.quadraticCurveTo(x - 8, y - 1, x, y + 3);
+        ctx.quadraticCurveTo(x + 8, y - 1, x + 14, y - f);
+        ctx.quadraticCurveTo(x + 7, y - 6 - f, x, y);
+        ctx.fill();
+      });
     }
   }
 
@@ -1546,7 +1591,7 @@
 
   function drawPumpkins(y) {
     const step = 110, off = -(travel % step), first = Math.floor(travel / step);
-    for (let k = 0; k < 6; k++) {
+    for (let k = stepFrom(off, step); off + k * step < VX1 + step; k++) {
       const h = hash(first + k);
       if (h % 3 === 0) continue;
       const cx = off + k * step + (h % 40), cy = y + 46;
@@ -1563,10 +1608,10 @@
   function drawRain() {
     ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.3; ctx.lineCap = 'round';
     ctx.beginPath();
+    const fall = H - GROUND - VY0;
     for (const d of DROPS) {
-      const y = (d.y + time * d.v) % (H - GROUND);
-      const x = (((d.x - time * d.v * 0.25 + hillX * 0.3) % W) + W) % W;
-      ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 11);
+      const y = VY0 + (d.y + time * d.v) % fall;
+      tileX(d.x - time * d.v * 0.25 + hillX * 0.3, x => { ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 11); });
     }
     ctx.stroke();
   }
@@ -1583,7 +1628,7 @@
 
   function drawLilies(y) {
     const step = 90, off = -(travel % step), first = Math.floor(travel / step);
-    for (let k = 0; k < 7; k++) {
+    for (let k = stepFrom(off, step); off + k * step < VX1 + step; k++) {
       const h = hash(first + k), cx = off + k * step + (h % 30), cy = y + 34 + (h % 3) * 13;
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.ellipse(cx, cy, 13, 5, 0, 0.25, Math.PI * 2 - 0.25); ctx.closePath();
       ctx.fillStyle = '#4fae57'; ctx.fill();
@@ -1610,7 +1655,7 @@
   function drawEggs(y) {
     const step = 70, off = -(travel % step), first = Math.floor(travel / step);
     const colors = ['#8fd3ff', '#ffb347', '#ff8fb1', '#c08cff', '#ffe066'];
-    for (let k = 0; k < 8; k++) {
+    for (let k = stepFrom(off, step); off + k * step < VX1 + step; k++) {
       const h = hash(first + k), cx = off + k * step + (h % 30), cy = y + 34 + (h % 3) * 13;
       oval(cx, cy, 5, 6.5, colors[h % colors.length]);
       ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillRect(cx - 4.5, cy - 1, 9, 2);
@@ -1661,16 +1706,16 @@
   }
 
   function drawLeaves() {
+    const fall = H - GROUND - VY0;
     for (const l of LEAVES) {
-      const y = (l.y + time * l.v) % (H - GROUND);
-      const x = (((l.x + hillX * 0.6 + Math.sin(time * 1.5 + l.p) * 14) % W) + W) % W;
-      oval(x, y, 3, 5, l.c, time * 2 + l.p);
+      const y = VY0 + (l.y + time * l.v) % fall;
+      tileX(l.x + hillX * 0.6 + Math.sin(time * 1.5 + l.p) * 14, x => oval(x, y, 3, 5, l.c, time * 2 + l.p));
     }
   }
 
   function drawPumpkinPatch(y) {
     const step = 80, off = -(travel % step), first = Math.floor(travel / step);
-    for (let k = 0; k < 7; k++) {
+    for (let k = stepFrom(off, step); off + k * step < VX1 + step; k++) {
       const h = hash(first + k);
       if (h % 4 === 0) continue;
       const cx = off + k * step + (h % 30), cy = y + 44 + (h % 2) * 10;
@@ -1684,13 +1729,14 @@
 
   function drawSea(offset) {
     const horizon = 420, shore = H - GROUND;
-    ctx.fillStyle = '#1e88c9'; ctx.fillRect(0, horizon, W, H - horizon);
-    ctx.fillStyle = '#3fb0e0'; ctx.fillRect(0, 466, W, H - 466);
+    ctx.fillStyle = '#1e88c9'; ctx.fillRect(VX0, horizon, VW, H - horizon);
+    ctx.fillStyle = '#3fb0e0'; ctx.fillRect(VX0, 466, VW, H - 466);
 
     // en segelbåt långt ute
-    const span = W + 80, bx = (((320 - time * 8) % span) + span) % span - 40;
-    poly([[bx - 12, horizon - 2], [bx + 12, horizon - 2], [bx + 8, horizon + 4], [bx - 8, horizon + 4]], '#8a5a2b');
-    poly([[bx, horizon - 26], [bx, horizon - 4], [bx + 13, horizon - 4]], '#ffffff');
+    spanX(320 - time * 8 - 40, W + 80, 40, bx => {
+      poly([[bx - 12, horizon - 2], [bx + 12, horizon - 2], [bx + 8, horizon + 4], [bx - 8, horizon + 4]], '#8a5a2b');
+      poly([[bx, horizon - 26], [bx, horizon - 4], [bx + 13, horizon - 4]], '#ffffff');
+    });
 
     ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
     for (const [y, step, f] of [[438, 70, 0.6], [456, 60, 0.8], [482, 54, 1]]) {
@@ -1700,9 +1746,9 @@
     }
     ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3;
     ctx.beginPath();
-    for (let x = 0; x <= W; x += 10) {
+    for (let x = VX0; x <= VX1 + 10; x += 10) {
       const y = shore - 6 + Math.sin(x * 0.08 + time * 2) * 2;
-      if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      if (x === VX0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
@@ -1740,8 +1786,8 @@
   }
 
   function drawSearchlights() {
-    for (let k = 0; k < 2; k++) {
-      const bx = 90 + k * 230, by = H - GROUND, a = -Math.PI / 2 + Math.sin(time * 0.5 + k * 2) * 0.5, len = 520;
+    for (let k = Math.floor((VX0 - 90) / 230) - 1; 90 + k * 230 < VX1 + 230; k++) {
+      const bx = 90 + k * 230, by = H - GROUND, a = -Math.PI / 2 + Math.sin(time * 0.5 + k * 2) * 0.5, len = 520 - VY0;
       poly([
         [bx, by],
         [bx + Math.cos(a - 0.09) * len, by + Math.sin(a - 0.09) * len],
@@ -1769,7 +1815,7 @@
         ctx.globalAlpha = 1;
       }
     });
-    ctx.fillStyle = color; ctx.fillRect(0, base, W, H - base);
+    ctx.fillStyle = color; ctx.fillRect(VX0, base, VW, H - base);
   }
 
   function drawBambooGrove(offset) {
@@ -1788,7 +1834,7 @@
   function drawLanterns(offset) {
     repeat(offset, 150, (x, i) => {
       const len = 60 + (hash(i) % 3) * 20, lx = x + Math.sin(time * 1.5 + i) * 3;
-      ctx.strokeStyle = '#5a3a2a'; ctx.lineWidth = 1; seg(x, 0, lx, len);
+      ctx.strokeStyle = '#5a3a2a'; ctx.lineWidth = 1; seg(x, VY0, lx, len);
       ctx.globalAlpha = 0.35; blob(lx, len + 12, 18, '#ffd27a'); ctx.globalAlpha = 1;
       oval(lx, len + 12, 10, 12, '#e63946');
       ctx.fillStyle = '#ffd23f';
@@ -1799,10 +1845,10 @@
   }
 
   function drawPetals() {
+    const fall = H - GROUND - VY0;
     for (const l of PETALS) {
-      const y = (l.y + time * l.v) % (H - GROUND);
-      const x = (((l.x + hillX * 0.6 + Math.sin(time * 1.2 + l.p) * 16) % W) + W) % W;
-      oval(x, y, 2.6, 3.8, '#ffb7d0', time * 1.5 + l.p);
+      const y = VY0 + (l.y + time * l.v) % fall;
+      tileX(l.x + hillX * 0.6 + Math.sin(time * 1.2 + l.p) * 16, x => oval(x, y, 2.6, 3.8, '#ffb7d0', time * 1.5 + l.p));
     }
   }
 
@@ -1815,16 +1861,17 @@
         poly([[x - w, y], [x, y - h * 0.5], [x + w, y]], color);
       }
     });
-    ctx.fillStyle = color; ctx.fillRect(0, base, W, H - base);
+    ctx.fillStyle = color; ctx.fillRect(VX0, base, VW, H - base);
   }
 
   function drawFireflies() {
     for (const f of FIREFLIES) {
-      const x = (((f.x + Math.sin(time * 0.7 + f.p) * 20 + hillX * 0.3) % W) + W) % W;
       const y = f.y + Math.cos(time * 0.9 + f.p) * 12;
       const glow = (Math.sin(time * 3 + f.p) + 1) / 2;
-      ctx.globalAlpha = glow * 0.3; blob(x, y, 6, '#d4ff6a');
-      ctx.globalAlpha = 0.3 + glow * 0.7; blob(x, y, 1.8, '#f4ffb0');
+      tileX(f.x + Math.sin(time * 0.7 + f.p) * 20 + hillX * 0.3, x => {
+        ctx.globalAlpha = glow * 0.3; blob(x, y, 6, '#d4ff6a');
+        ctx.globalAlpha = 0.3 + glow * 0.7; blob(x, y, 1.8, '#f4ffb0');
+      });
     }
     ctx.globalAlpha = 1;
   }
@@ -1854,7 +1901,7 @@
         blob(x + 90 + Math.sin(t * 4 + i) * 6, base - 146 - t * 70, 7 + t * 14, `rgba(120,128,138,${0.45 * (1 - t)})`);
       }
     });
-    ctx.fillStyle = '#6f7b87'; ctx.fillRect(0, base, W, H - base);
+    ctx.fillStyle = '#6f7b87'; ctx.fillRect(VX0, base, VW, H - base);
   }
 
   function drawGears(offset) {
@@ -1866,12 +1913,12 @@
 
   function drawHazard(y) {
     ctx.save();
-    ctx.beginPath(); ctx.rect(0, y + 40, W, 10); ctx.clip();
-    ctx.fillStyle = '#ffd23f'; ctx.fillRect(0, y + 40, W, 10);
+    ctx.beginPath(); ctx.rect(VX0, y + 40, VW, 10); ctx.clip();
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(VX0, y + 40, VW, 10);
     ctx.fillStyle = '#1d2b1f';
-    for (let x = -(travel % 24) - 24; x < W + 24; x += 24) {
+    spanX(-(travel % 24), 24, 24, x => {
       ctx.beginPath(); ctx.moveTo(x, y + 50); ctx.lineTo(x + 10, y + 40); ctx.lineTo(x + 20, y + 40); ctx.lineTo(x + 10, y + 50); ctx.fill();
-    }
+    });
     ctx.restore();
   }
 
@@ -1921,13 +1968,13 @@
         blob(x + 26, base - 80, 4, '#5a3a2a');
       }
     });
-    ctx.fillStyle = '#9ccf6a'; ctx.fillRect(0, base, W, H - base);
+    ctx.fillStyle = '#9ccf6a'; ctx.fillRect(VX0, base, VW, H - base);
   }
 
   function drawWoodFence(offset) {
     ctx.fillStyle = '#8a5a2b';
-    ctx.fillRect(0, 486, W, 5);
-    ctx.fillRect(0, 500, W, 5);
+    ctx.fillRect(VX0, 486, VW, 5);
+    ctx.fillRect(VX0, 500, VW, 5);
     repeat(offset, 40, x => { ctx.fillStyle = '#7a4a24'; ctx.fillRect(x, 476, 6, 40); });
   }
 
@@ -1944,9 +1991,9 @@
 
   function drawDunes(offset, base, color, step) {
     ctx.fillStyle = color;
-    ctx.beginPath(); ctx.moveTo(0, H);
-    for (let x = 0; x <= W; x += 8) ctx.lineTo(x, base - 14 + Math.sin(((x - offset) / step) * Math.PI * 2) * 12);
-    ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(VX0, H);
+    for (let x = VX0; x <= VX1 + 8; x += 8) ctx.lineTo(x, base - 14 + Math.sin(((x - offset) / step) * Math.PI * 2) * 12);
+    ctx.lineTo(VX1 + 8, H); ctx.closePath(); ctx.fill();
   }
 
   function drawAlienPlants(offset) {
@@ -1963,7 +2010,7 @@
 
   function drawCraters(y) {
     const step = 80, off = -(travel % step), first = Math.floor(travel / step);
-    for (let k = 0; k < 7; k++) {
+    for (let k = stepFrom(off, step); off + k * step < VX1 + step; k++) {
       const h = hash(first + k);
       const cx = off + k * step + (h % 30), cy = y + 36 + (h % 3) * 12, rx = 8 + (h % 4) * 3;
       oval(cx, cy, rx, rx * 0.4, '#74768c');
@@ -1974,7 +2021,7 @@
   function dots(colors) {
     return y => {
       const step = 34, off = -(travel % step), first = Math.floor(travel / step);
-      for (let k = 0; k < 14; k++) {
+      for (let k = stepFrom(off, step); off + k * step < VX1 + step; k++) {
         const h = hash(first + k);
         blob(off + k * step + (h % 20), y + 30 + (h % 4) * 11, 2.2, colors[h % colors.length]);
       }
@@ -1983,17 +2030,17 @@
 
   function drawGround(g) {
     const y = H - GROUND;
-    ctx.fillStyle = g.base; ctx.fillRect(0, y, W, GROUND);
-    ctx.fillStyle = g.band; ctx.fillRect(0, y + 16, W, 6);
-    ctx.fillStyle = g.top; ctx.fillRect(0, y, W, 16);
+    ctx.fillStyle = g.base; ctx.fillRect(VX0, y, VW, GROUND);
+    ctx.fillStyle = g.band; ctx.fillRect(VX0, y + 16, VW, 6);
+    ctx.fillStyle = g.top; ctx.fillRect(VX0, y, VW, 16);
     ctx.fillStyle = g.stripe;
-    for (let x = groundX; x < W + 24; x += 24) {
+    spanX(groundX, 24, 24, x => {
       ctx.beginPath();
       ctx.moveTo(x, y + 16); ctx.lineTo(x + 10, y); ctx.lineTo(x + 20, y); ctx.lineTo(x + 10, y + 16);
       ctx.fill();
-    }
+    });
     g.decor?.(y);
-    ctx.fillStyle = C.ink; ctx.fillRect(0, y - 1, W, 3);
+    ctx.fillStyle = C.ink; ctx.fillRect(VX0, y - 1, VW, 3);
   }
 
   // ---------- Sugrören ----------
@@ -2052,7 +2099,7 @@
 
   function drawStraws(p) {
     const [topEnd, botStart] = gapEnds(p);
-    drawTube(p.x, -2, topEnd, p.tint);
+    drawTube(p.x, VY0 - 2, topEnd, p.tint);
     drawBend(p.x, topEnd - 40, topEnd - 10, p.tint);
     drawOpening(p.x, topEnd, p.tint);
     drawTube(p.x, botStart, H - GROUND, p.tint);
@@ -2075,7 +2122,7 @@
 
   function drawPipes(p) {
     const [topEnd, botStart] = gapEnds(p);
-    pipeSection(p.x + 4, -2, topEnd - 24, PIPE_W - 8);
+    pipeSection(p.x + 4, VY0 - 2, topEnd - 24, PIPE_W - 8);
     pipeSection(p.x, topEnd - 24, topEnd, PIPE_W);
     pipeSection(p.x, botStart, botStart + 24, PIPE_W);
     pipeSection(p.x + 4, botStart + 24, H - GROUND, PIPE_W - 8);
@@ -2106,7 +2153,7 @@
 
   function drawPencils(p) {
     const [topEnd, botStart] = gapEnds(p);
-    pencil(p.x, -2, topEnd, 1, p.tint);
+    pencil(p.x, VY0 - 2, topEnd, 1, p.tint);
     pencil(p.x, H - GROUND, botStart, -1, p.tint);
   }
 
@@ -2133,7 +2180,7 @@
 
   function drawBricks(p) {
     const [topEnd, botStart] = gapEnds(p);
-    brickStack(p.x, topEnd, -1, -2, p);
+    brickStack(p.x, topEnd, -1, VY0 - 2, p);
     brickStack(p.x, botStart, 1, H - GROUND, p);
   }
 
@@ -2184,7 +2231,7 @@
 
   function drawCacti(p) {
     const [topEnd, botStart] = gapEnds(p);
-    cactus(p.x, topEnd, -2, -1, p);
+    cactus(p.x, topEnd, VY0 - 2, -1, p);
     cactus(p.x, botStart, H - GROUND, 1, p);
   }
 
@@ -2213,7 +2260,7 @@
 
   function drawColumns(p) {
     const [topEnd, botStart] = gapEnds(p);
-    column(p.x, -2, topEnd, -1);
+    column(p.x, VY0 - 2, topEnd, -1);
     column(p.x, H - GROUND, botStart, 1);
   }
 
@@ -2244,7 +2291,7 @@
 
   function drawLogs(p) {
     const [topEnd, botStart] = gapEnds(p);
-    log(p.x, -2, topEnd, -1);
+    log(p.x, VY0 - 2, topEnd, -1);
     log(p.x, H - GROUND, botStart, 1);
   }
 
@@ -2267,7 +2314,7 @@
 
   function drawIcicles(p) {
     const [topEnd, botStart] = gapEnds(p);
-    icicle(p.x, -2, topEnd, 1);
+    icicle(p.x, VY0 - 2, topEnd, 1);
     icicle(p.x, H - GROUND, botStart, -1);
   }
 
@@ -2296,7 +2343,7 @@
 
   function drawPopsicles(p) {
     const [topEnd, botStart] = gapEnds(p);
-    popsicle(p.x, -2, topEnd, -1, p.tint);
+    popsicle(p.x, VY0 - 2, topEnd, -1, p.tint);
     popsicle(p.x, H - GROUND, botStart, 1, p.tint);
   }
 
@@ -2320,7 +2367,7 @@
 
   function drawMushrooms(p) {
     const [topEnd, botStart] = gapEnds(p);
-    mushroom(p.x, -2, topEnd, -1);
+    mushroom(p.x, VY0 - 2, topEnd, -1);
     mushroom(p.x, H - GROUND, botStart, 1);
   }
 
@@ -2350,7 +2397,7 @@
 
   function drawLampPosts(p) {
     const [topEnd, botStart] = gapEnds(p);
-    lampPost(p.x, -2, topEnd, -1);
+    lampPost(p.x, VY0 - 2, topEnd, -1);
     lampPost(p.x, H - GROUND, botStart, 1);
   }
 
@@ -2386,7 +2433,7 @@
 
   function drawCakes(p) {
     const [topEnd, botStart] = gapEnds(p);
-    cake(p.x, -2, topEnd, -1, p.seed);
+    cake(p.x, VY0 - 2, topEnd, -1, p.seed);
     cake(p.x, H - GROUND, botStart, 1, p.seed + 1);
   }
 
@@ -3619,16 +3666,17 @@
 
   // Krafterna som verkar just nu, uppe till vänster under världens namn.
   function drawActivePowers() {
-    let x = 20;
+    let x = UI_L + 20;
+    const y = UI_T + 52;
     POWERS.forEach((pw, i) => {
       const left = pw.left();
       if (left <= 0) return;
-      rr(x, 52, 34, 34, 10);
+      rr(x, y, 34, 34, 10);
       ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
       ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.stroke();
-      drawPower(i, x + 17, 69, 0.85);
+      drawPower(i, x + 17, y + 17, 0.85);
       if (pw.secs) {
-        rr(x + 3, 90, 28 * left, 5, 2.5);
+        rr(x + 3, y + 38, 28 * left, 5, 2.5);
         ctx.fillStyle = C.banana; ctx.fill();
       }
       x += 40;
@@ -3640,13 +3688,16 @@
   // Startskärmens två knappar högst upp.
   // Startskärmen: stor figur och Starta i mitten, tre knappar längst ner och
   // en bricka med figur och nivå uppe till höger.
-  const BTN_W = 118, BTN_H = 60, BTN_Y = H - 74;
-  const FIGURES_BTN = { x: 14, y: BTN_Y, w: BTN_W, h: BTN_H };
-  const SETTINGS_BTN = { x: (W - BTN_W) / 2, y: BTN_Y, w: BTN_W, h: BTN_H };
-  const SCORES_BTN = { x: W - 14 - BTN_W, y: BTN_Y, w: BTN_W, h: BTN_H };
-  const START_BTN = { x: W / 2 - 110, y: 386, w: 220, h: 64 };
-  const LEVEL_BADGE = { x: W - 14 - 132, y: 14, w: 132, h: 44 };
-  const MEDAL_BADGE = { x: 14, y: 14, w: 132, h: 44 };
+  // Brickorna sitter i skärmens övre hörn och knapparna mot underkanten; de räknas
+  // fram varje gång, eftersom skärmen kan ändra storlek.
+  const BTN_W = 118, BTN_H = 60;
+  const bottomBtn = x => ({ x, y: UI_B - 74, w: BTN_W, h: BTN_H });
+  const figuresBtn = () => bottomBtn(14);
+  const settingsBtn = () => bottomBtn((W - BTN_W) / 2);
+  const scoresBtn = () => bottomBtn(W - 14 - BTN_W);
+  const startBtn = () => ({ x: W / 2 - 110, y: 386 + MID, w: 220, h: 64 });
+  const levelBadge = () => ({ x: UI_R - 14 - 132, y: UI_T + 14, w: 132, h: 44 });
+  const medalBadge = () => ({ x: UI_L + 14, y: UI_T + 14, w: 132, h: 44 });
 
   function drawGear(cx, cy) {
     ctx.save();
@@ -3676,19 +3727,20 @@
   // Ikon överst och namn under, så att alla tre får plats på en rad.
   function drawStartButtons() {
     const label = (b, text) => say(text, b.x + b.w / 2, b.y + 46, 14, { font: BODY, weight: '800', fill: C.ink, stroke: null });
-    drawButtonFrame(FIGURES_BTN, false);
-    drawFigure(charIndex, FIGURES_BTN.x + BTN_W / 2, FIGURES_BTN.y + 21, { scale: 0.48, beat: Math.sin(time * 6) * 0.4 });
-    label(FIGURES_BTN, 'Figurer');
-    drawButtonFrame(SETTINGS_BTN, false);
-    drawGear(SETTINGS_BTN.x + BTN_W / 2, SETTINGS_BTN.y + 21);
-    label(SETTINGS_BTN, 'Inställningar');
-    drawButtonFrame(SCORES_BTN, false);
-    drawTrophy(SCORES_BTN.x + BTN_W / 2, SCORES_BTN.y + 8);
-    label(SCORES_BTN, 'Topplista');
+    const fig = figuresBtn(), set = settingsBtn(), top = scoresBtn();
+    drawButtonFrame(fig, false);
+    drawFigure(charIndex, fig.x + BTN_W / 2, fig.y + 21, { scale: 0.48, beat: Math.sin(time * 6) * 0.4 });
+    label(fig, 'Figurer');
+    drawButtonFrame(set, false);
+    drawGear(set.x + BTN_W / 2, set.y + 21);
+    label(set, 'Inställningar');
+    drawButtonFrame(top, false);
+    drawTrophy(top.x + BTN_W / 2, top.y + 8);
+    label(top, 'Topplista');
   }
 
   function drawLevelBadge() {
-    const b = LEVEL_BADGE;
+    const b = levelBadge();
     drawButtonFrame(b, false);
     drawFigure(charIndex, b.x + 26, b.y + 23, { scale: 0.48, beat: Math.sin(time * 6) * 0.4 });
     say(`Nivå ${bestLevel}`, b.x + 50, b.y + 23, 19, { fill: C.ink, stroke: null, align: 'left' });
@@ -3696,7 +3748,7 @@
 
   // Medaljsamlingen uppe till vänster: hur många av varje; de man inte har är bleka.
   function drawMedalBadge() {
-    const b = MEDAL_BADGE;
+    const b = medalBadge();
     drawButtonFrame(b, false);
     MEDALS.forEach((m, i) => {
       const x = b.x + 18 + i * 40;
@@ -3708,7 +3760,7 @@
   }
 
   function drawStartButton() {
-    const b = START_BTN, press = 1 + Math.sin(time * 3) * 0.02;
+    const b = startBtn(), press = 1 + Math.sin(time * 3) * 0.02;
     ctx.save();
     ctx.translate(b.x + b.w / 2, b.y + b.h / 2); ctx.scale(press, press);
     rr(-b.w / 2, -b.h / 2, b.w, b.h, b.h / 2);
@@ -3845,7 +3897,7 @@
   const closeButton = panel => ({ x: W / 2 - 80, y: panel.y + panel.h - 54, w: 160, h: 44 });
   const CLOSE_BTN = closeButton(PANEL);
 
-  function dim() { ctx.fillStyle = 'rgba(16,41,27,0.55)'; ctx.fillRect(0, 0, W, H); }
+  function dim() { fillScreen('rgba(16,41,27,0.55)'); }
 
   function drawPanel(panel, title) {
     rr(panel.x, panel.y, panel.w, panel.h, 20);
@@ -3948,47 +4000,49 @@
 
   function drawHud() {
     if (state === 'playing') {
-      say(String(score), W - 20, 40, 46, { align: 'right' });
+      say(String(score), UI_R - 20, UI_T + 40, 46, { align: 'right' });
       const left = nextWorldAt - score;
-      say(`${left} till nästa värld`, W - 20, 76, 13, { font: BODY, weight: '800', align: 'right' });
+      say(`${left} till nästa värld`, UI_R - 20, UI_T + 76, 13, { font: BODY, weight: '800', align: 'right' });
       // vilken värld, och hur många man har flugit genom den här omgången
-      say(`${worldName()} – ${worldStep + 1} av ${WORLDS.length}`, 20, 38, 18, { align: 'left' });
+      say(`${worldName()} – ${worldStep + 1} av ${WORLDS.length}`, UI_L + 20, UI_T + 38, 18, { align: 'left' });
       drawActivePowers();
-      drawBoxRow(box, 30, H - GROUND + 46, { empty: 'Samla saker i lådan!' });
+      drawBoxRow(box, UI_L + 30, Math.min(H - GROUND + 46, UI_B - 24), { empty: 'Samla saker i lådan!' });
 
       // medaljen när man når den, som tonar bort
       const mk = (time - medalShownAt) / 1.8;
       if (medal >= 0 && mk >= 0 && mk < 1) {
         ctx.globalAlpha = mk < 0.75 ? 1 : (1 - mk) * 4;
-        drawMedalLine(MEDALS[medal], W / 2, 128, 26, MEDALS[medal].name + '!', { fill: MEDALS[medal].color });
+        drawMedalLine(MEDALS[medal], W / 2, UI_T + 128, 26, MEDALS[medal].name + '!', { fill: MEDALS[medal].color });
         ctx.globalAlpha = 1;
       }
 
       // "Ny värld!" och världens namn, som tonar bort efter en stund
       const k = (time - worldShownAt) / 2;
-      if (k >= 0 && k < 1) {
+      if (k >= 0 && k < 1) uiFrame(() => {
         ctx.globalAlpha = k < 0.75 ? 1 : (1 - k) * 4;
         say('Ny värld!', W / 2, 196, 40, { fill: C.banana });
         say(worldName(), W / 2, 238, 26);
         say(`+${WORLD_BONUS} blå mynt`, W / 2, 272, 18, { fill: C.blue });
         if (worldNews()) say(worldNews(), W / 2, 302, 18);
         ctx.globalAlpha = 1;
+      });
+    }
+
+    uiFrame(() => {
+      if (paused && !overlay) {
+        say('Pausat', W / 2, 190, 48, { fill: C.banana });
+        say('Tryck för att fortsätta', W / 2, 236, 22);
       }
-    }
 
-    if (paused && !overlay) {
-      say('Pausat', W / 2, 190, 48, { fill: C.banana });
-      say('Tryck för att fortsätta', W / 2, 236, 22);
-    }
+      if (state === 'ready') {
+        say('Flappy Game', W / 2, 112, 52, { fill: C.banana });
+        // den valda figuren, stor
+        drawFigure(charIndex, W / 2, 244 + Math.sin(time * 3) * 6, { scale: 2.6, beat: Math.sin(time * 9) * 0.6 });
+        say(CHARACTERS[charIndex].name, W / 2, 348, 26);
+      }
 
-    if (state === 'ready') {
-      say('Flappy Game', W / 2, 112, 52, { fill: C.banana });
-      // den valda figuren, stor
-      drawFigure(charIndex, W / 2, 244 + Math.sin(time * 3) * 6, { scale: 2.6, beat: Math.sin(time * 9) * 0.6 });
-      say(CHARACTERS[charIndex].name, W / 2, 348, 26);
-    }
-
-    if (state === 'over') drawOver();
+      if (state === 'over') drawOver();
+    });
   }
 
   function draw() {
@@ -3999,17 +4053,14 @@
     drawItems();
     drawPlayer();
     // slow motion färgar världen lite blå
-    if (state === 'playing' && time < slowUntil) { ctx.fillStyle = 'rgba(120,170,255,0.14)'; ctx.fillRect(0, 0, W, H); }
+    if (state === 'playing' && time < slowUntil) fillScreen('rgba(120,170,255,0.14)');
     drawPortal();
     drawPopups();
     drawHud();
-    if (flash > 0) {
-      ctx.fillStyle = `rgba(255,255,255,${flash * 0.7})`;
-      ctx.fillRect(0, 0, W, H);
-    }
-    if (overlay === 'scores') drawBoard('close');
-    if (overlay === 'settings') drawSettings();
-    if (overlay === 'figures') drawFigures();
+    if (flash > 0) fillScreen(`rgba(255,255,255,${flash * 0.7})`);
+    if (overlay === 'scores') uiFrame(() => drawBoard('close'));
+    if (overlay === 'settings') uiFrame(drawSettings);
+    if (overlay === 'figures') uiFrame(drawFigures);
     if (state === 'ready' && !overlay) { drawStartButton(); drawStartButtons(); drawLevelBadge(); drawMedalBadge(); }
   }
 
@@ -4017,7 +4068,7 @@
 
   function toWorld(e) {
     const r = canvas.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+    return { x: VX0 + (e.clientX - r.left) / r.width * VW, y: VY0 + (e.clientY - r.top) / r.height * VH };
   }
 
 
@@ -4027,23 +4078,25 @@
     canvas.focus({ preventScroll: true });
     sfx.unlock();
     const p = toWorld(e);
-    if (overlay === 'figures') return tapFigures(p);
+    // rutorna ritas flyttade med MID
+    const q = { x: p.x, y: p.y - MID };
+    if (overlay === 'figures') return tapFigures(q);
     if (state === 'ready' && !overlay) {
       // på startskärmen startar bara Starta; knapparna öppnar sina rutor
-      if (inside(p, START_BTN)) return flap();
-      if (inside(p, FIGURES_BTN) || inside(p, LEVEL_BADGE)) return openOverlay('figures');
-      if (inside(p, SETTINGS_BTN)) return openOverlay('settings');
-      if (inside(p, SCORES_BTN)) return openOverlay('scores');
+      if (inside(p, startBtn())) return flap();
+      if (inside(p, figuresBtn()) || inside(p, levelBadge())) return openOverlay('figures');
+      if (inside(p, settingsBtn())) return openOverlay('settings');
+      if (inside(p, scoresBtn())) return openOverlay('scores');
       return;
     }
     if (overlay === 'settings') {
-      if (inside(p, settingsRow(0))) return sfx.toggleSfx();
-      if (inside(p, settingsRow(1))) return sfx.toggleMusic();
-      if (inside(p, SETTINGS_CLOSE) || !inside(p, SETTINGS_PANEL)) closeOverlay();
+      if (inside(q, settingsRow(0))) return sfx.toggleSfx();
+      if (inside(q, settingsRow(1))) return sfx.toggleMusic();
+      if (inside(q, SETTINGS_CLOSE) || !inside(q, SETTINGS_PANEL)) closeOverlay();
       return;
     }
     if (overlay === 'scores') {
-      if (inside(p, CLOSE_BTN) || !inside(p, PANEL)) closeOverlay();
+      if (inside(q, CLOSE_BTN) || !inside(q, PANEL)) closeOverlay();
       return;
     }
     flap();
