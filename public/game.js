@@ -52,6 +52,11 @@
   };
   const PUMPA = { body: '#ff8c1a', dark: '#e0700a', rib: '#c95c08', stem: '#5a7a2a', leaf: '#6cbf3a', leafBack: '#4f9e2c', leafEdge: '#3f8a24', glow: '#ffe066', carve: '#5a2a00' };
   const SOL = { core: '#ffd23f', edge: '#f5a300', ray: '#ffb800', cheek: '#ff9a6a', glasses: '#1d2b1f', smile: '#c26a00' };
+  const PRINS = {
+    dress: '#ff8fc8', dressDark: '#e0569e', dressLight: '#ffc2e2', edge: '#b83a7c', skin: '#ffd9c2', skinEdge: '#e0a98c',
+    blush: '#ff9eb8', hair: '#ffcf5a', hairDark: '#d9a32e', wing: 'rgba(225,238,255,0.78)', wingEdge: '#b9a6ff',
+    tiara: '#ffe066', tiaraEdge: '#b88a00', gem: '#ff4f9a', wand: '#ffd23f',
+  };
   const GULD = { main: '#ffd23f', mid: '#f5b301', dark: '#c98f00', edge: '#8a6200', light: '#fff1a8', crown: '#ffe066', gems: ['#e63946', '#2f80ed', '#2bb673'] };
   const HERO = {
     suit: '#2f6fd6', suitDark: '#1f4fa8', cape: '#e63946', capeDark: '#b5212e', belt: '#ffd23f',
@@ -91,6 +96,7 @@
     { id: 'ko', name: 'Ko', world: 'Bondgård', flight: 'Kon flaxar med små vingar', draw: drawCow },
     { id: 'kamel', name: 'Kamel', world: 'Öken', flight: 'Kamelen åker flygande matta', draw: drawCamel },
     { id: 'alien', name: 'Rymdvarelse', world: 'Främmande planet', flight: 'Rymdvarelsen flyger i sitt tefat', draw: drawAlien },
+    { id: 'prinsessa', name: 'Prinsessa', world: 'Slott', flight: 'Prinsessan flyger på älvvingar', draw: drawPrincess },
     // en gåva till Wilhelm, som var först på topplistan
     { id: 'guld', name: 'Guldperson', world: 'Guldland', flight: 'Guldpersonen flyger på gyllene vingar', draw: drawGold, gift: 'wilhelm' },
   ];
@@ -969,7 +975,7 @@
   // Figurer som låter på sitt eget sätt när de flaxar; resten låter som vingar.
   const FLAP_SOUND = {
     astronaut: 'jet', robot: 'jet', drake: 'fire', bi: 'buzz', spoke: 'woo', alien: 'zap',
-    blackfisk: 'bubble', groda: 'boing', ko: 'moo', hund: 'woof', enhorning: 'chime', sol: 'chime', tomte: 'chime', guld: 'chime',
+    blackfisk: 'bubble', groda: 'boing', ko: 'moo', hund: 'woof', enhorning: 'chime', sol: 'chime', tomte: 'chime', guld: 'chime', prinsessa: 'chime',
   };
 
   // ---------- Spelets gång ----------
@@ -3248,6 +3254,60 @@
     }
   }
 
+  // En prinsessa i rosa klänning som flyger på älvvingar, med tiara och ett trollspö.
+  function drawPrincess({ boost, dead }) {
+    const flutter = dead ? 0 : Math.sin(time * (boost ? 26 : 16)) * 0.35;
+    for (const [rot, len] of [[-0.9 + flutter, 15], [-0.25 + flutter * 0.6, 11]]) {
+      ctx.save(); ctx.translate(-5, -2); ctx.rotate(rot);
+      ctx.beginPath(); ctx.ellipse(-len, 0, len, len * 0.5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = PRINS.wing; ctx.fill();
+      ctx.strokeStyle = PRINS.wingEdge; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.restore();
+    }
+    oval(-6, -4, 5, 11, PRINS.hairDark, 0.3);
+
+    // klänningen: en klocka med vågig fåll
+    ctx.beginPath();
+    ctx.moveTo(-5, -1); ctx.lineTo(5, -1);
+    ctx.quadraticCurveTo(10, 8, 14, 15);
+    for (let k = 0; k < 4; k++) ctx.quadraticCurveTo(10.5 - k * 7, 19, 7 - k * 7, 15);
+    ctx.quadraticCurveTo(-10, 8, -5, -1);
+    ctx.closePath();
+    ctx.fillStyle = PRINS.dress; ctx.fill();
+    ctx.strokeStyle = PRINS.edge; ctx.lineWidth = 1.5; ctx.stroke();
+    oval(1, 7, 3, 6, PRINS.dressLight, -0.15);
+    rr(-5.5, -1.5, 11, 3, 1.5); ctx.fillStyle = PRINS.dressDark; ctx.fill();
+
+    oval(-6, 3, 2.2, 5, PRINS.skin, 0.4);
+    oval(8, 1, 5, 2.2, PRINS.skin, -0.4);
+    blob(12, -1, 2.3, PRINS.skin);
+    ctx.strokeStyle = PRINS.wand; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    seg(12, -1, 18, -9);
+    star(19.5, -11, 4 + (dead ? 0 : Math.sin(time * 8) * 0.8), PRINS.tiara);
+
+    ovalEdge(1, -11, 8, 8, PRINS.skin, PRINS.skinEdge);
+    oval(-6, -8, 3, 7.5, PRINS.hair, 0.15);
+    oval(-0.5, -16.5, 8, 3.8, PRINS.hair, -0.1);
+    poly([[-4, -17], [-3, -23], [0, -19.5], [2, -25], [4, -19.5], [7, -23], [8, -17]], PRINS.tiara, PRINS.tiaraEdge);
+    blob(2, -19.8, 1.5, PRINS.gem);
+    if (dead) {
+      xEye(3, -11, 1.8);
+      xEye(7.5, -11, 1.8);
+    } else {
+      oval(3, -11, 1.3, 1.8, C.ink);
+      oval(7.5, -11, 1.3, 1.8, C.ink);
+      blob(3.4, -11.7, 0.5, C.white);
+      blob(7.9, -11.7, 0.5, C.white);
+    }
+    oval(1.5, -7.5, 1.8, 1.1, PRINS.blush);
+    oval(9, -7.5, 1.8, 1.1, PRINS.blush);
+    ctx.strokeStyle = PRINS.edge; ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.arc(5.5, -8.5, 2, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+
+    // gnistor efter trollspöet när hon flaxar
+    if (boost && !dead) for (const [x, y] of [[-18, 12], [-24, 4]]) star(x, y, 2.2, PRINS.dressLight);
+  }
+
   function drawPanda({ boost, dead }) {
     if (!dead) {
       for (let k = 1; k <= 3; k++) {
@@ -3883,7 +3943,10 @@
     const sections = [], cells = [];
     let y = FIG_PANEL.y + 76;
     const firstTitle = choosingFirst() ? 'Välj din första figur' : `Dina figurer (${owned.length})`;
-    for (const [title, list, mine] of [[firstTitle, owned, true], [`Kvar att få (${missing.length})`, missing, false]]) {
+    const parts = [[firstTitle, owned, true]];
+    // har man alla figurer behövs ingen rad för dem som är kvar
+    if (missing.length || choosingFirst()) parts.push([`Kvar att få (${missing.length})`, missing, false]);
+    for (const [title, list, mine] of parts) {
       sections.push({ title, y });
       y += 20;
       list.forEach((ci, k) => cells.push({
