@@ -1,0 +1,99 @@
+/* Layout: one portrait game screen, centered and scaled to fit, on a dark ground.
+   A single deliberate look: the game world is the same in light and dark. */
+:root {
+  --ground: #10291b;
+  --text: #f4f1e0;
+  --banana: #ffd23f;
+  --panel: #fff7e0;
+  --ink: #1d2b1f;
+  --dirt: #8a5a2b;
+  --white: #ffffff;
+  --error: #b3261e;
+  --shadow: rgb(0 0 0 / .45);
+  /* --font-lilita och --font-nunito sätts av next/font i app/layout.tsx */
+  --font-display: var(--font-lilita), "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+  --font-body: var(--font-nunito), "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0;
+  box-sizing: border-box;
+  padding-block: 16px;
+  padding-inline: 16px;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-body);
+  display: flex;
+  overflow: hidden;
+}
+.stage { flex: 1; min-width: 0; min-height: 0; display: grid; place-items: center; }
+.screen { position: relative; }
+canvas {
+  display: block;
+  border-radius: 14px;
+  box-shadow: 0 10px 40px var(--shadow);
+  touch-action: manipulation;
+  cursor: pointer;
+  outline: none;
+}
+canvas:focus-visible { outline: 3px solid var(--banana); outline-offset: 4px; }
+/* Klassernas display-regler får inte visa det som är dolt. */
+[hidden] { display: none !important; }
+
+/* Namnrutan för topplistan; skalar med spelet via --s. */
+.entry {
+  position: absolute; left: 50%; top: 45%;
+  transform: translate(-50%, -50%);
+  width: calc(var(--s, 1) * 290px);
+  box-sizing: border-box;
+  padding: calc(var(--s, 1) * 20px);
+  display: grid; gap: calc(var(--s, 1) * 10px); justify-items: center;
+  background: var(--panel); color: var(--ink);
+  border: calc(var(--s, 1) * 4px) solid var(--ink);
+  border-radius: calc(var(--s, 1) * 20px);
+  font-family: var(--font-body);
+  text-align: center;
+}
+.entry-badge {
+  margin: 0;
+  padding: calc(var(--s, 1) * 4px) calc(var(--s, 1) * 14px);
+  background: var(--banana);
+  border: calc(var(--s, 1) * 3px) solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: calc(var(--s, 1) * 18px);
+}
+.entry-title {
+  margin: 0;
+  font-family: var(--font-display); font-weight: 400;
+  font-size: calc(var(--s, 1) * 26px); line-height: 1.1;
+  text-wrap: balance;
+}
+.entry label {
+  font-weight: 800; font-size: calc(var(--s, 1) * 13px);
+  color: var(--dirt); letter-spacing: .06em; text-transform: uppercase;
+}
+.entry input {
+  width: 100%; box-sizing: border-box;
+  font: 800 max(16px, calc(var(--s, 1) * 20px))/1.2 var(--font-body);
+  padding: calc(var(--s, 1) * 10px);
+  text-align: center;
+  color: var(--ink); background: var(--white);
+  border: calc(var(--s, 1) * 3px) solid var(--ink);
+  border-radius: calc(var(--s, 1) * 12px);
+}
+.entry-actions { display: flex; gap: calc(var(--s, 1) * 10px); width: 100%; }
+.entry button {
+  flex: 1;
+  font: 400 calc(var(--s, 1) * 18px)/1 var(--font-display);
+  padding: calc(var(--s, 1) * 12px) calc(var(--s, 1) * 8px);
+  border: calc(var(--s, 1) * 3px) solid var(--ink);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.entry .primary { background: var(--ink); color: var(--white); }
+.entry .secondary { background: transparent; color: var(--ink); }
+.entry button:disabled { opacity: .6; cursor: default; }
+.entry input:focus-visible, .entry button:focus-visible { outline: 3px solid var(--banana); outline-offset: 2px; }
+.entry-error { margin: 0; color: var(--error); font-weight: 800; font-size: calc(var(--s, 1) * 13px); }
