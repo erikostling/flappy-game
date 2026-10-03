@@ -91,10 +91,8 @@
     { id: 'ko', name: 'Ko', world: 'Bondgård', flight: 'Kon flaxar med små vingar', draw: drawCow },
     { id: 'kamel', name: 'Kamel', world: 'Öken', flight: 'Kamelen åker flygande matta', draw: drawCamel },
     { id: 'alien', name: 'Rymdvarelse', world: 'Främmande planet', flight: 'Rymdvarelsen flyger i sitt tefat', draw: drawAlien },
-    // den dyraste, med eget pris
-    { id: 'guldperson', name: 'Guldperson', world: 'Guldland', flight: 'Guldpersonen flyger på gyllene vingar', draw: drawGoldPerson, price: 25 },
     // en gåva till Wilhelm, som var först på topplistan
-    { id: 'guld', name: 'Guldkung', world: 'Guldland', flight: 'Guldkungen flyger på gyllene vingar med krona', draw: drawGoldKing, gift: 'wilhelm' },
+    { id: 'guld', name: 'Guldperson', world: 'Guldland', flight: 'Guldpersonen flyger på gyllene vingar', draw: drawGold, gift: 'wilhelm' },
   ];
 
   const THEMES = {
@@ -516,7 +514,6 @@
   const PRICES = [3, 5, 10, 15, 20], PRICE_GROUP = 5;
   const OTHER_FIGURES = CHARACTERS.filter(c => !c.gift).map(c => c.id).filter(id => !START_FIGURES.includes(id));
   function figurePrice(ci) {
-    if (CHARACTERS[ci].price) return CHARACTERS[ci].price;
     const id = CHARACTERS[ci].id;
     const place = START_FIGURES.includes(id) ? 0 : START_FIGURES.length - 1 + OTHER_FIGURES.indexOf(id);
     return PRICES[Math.floor(place / PRICE_GROUP)];
@@ -972,7 +969,7 @@
   // Figurer som låter på sitt eget sätt när de flaxar; resten låter som vingar.
   const FLAP_SOUND = {
     astronaut: 'jet', robot: 'jet', drake: 'fire', bi: 'buzz', spoke: 'woo', alien: 'zap',
-    blackfisk: 'bubble', groda: 'boing', ko: 'moo', hund: 'woof', enhorning: 'chime', sol: 'chime', tomte: 'chime', guld: 'chime', guldperson: 'chime',
+    blackfisk: 'bubble', groda: 'boing', ko: 'moo', hund: 'woof', enhorning: 'chime', sol: 'chime', tomte: 'chime', guld: 'chime',
   };
 
   // ---------- Spelets gång ----------
@@ -3195,24 +3192,8 @@
     ctx.beginPath(); ctx.arc(8, -5, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
   }
 
-  // En person i guld som flyger med gyllene vingar och har gnistor runt sig.
-  // Guldpersonen har guldhår, Guldkungen en krona med ädelstenar.
-  // (deklarationer, inte pilar: CHARACTERS högst upp pekar på dem innan koden här har körts)
-  function drawGoldPerson(o) {
-    // lockigt guldhår över pannan
-    goldPerson(o, () => {
-      for (const [x, y, r] of [[-2.5, -14.5, 3.6], [1.5, -18, 4], [6.5, -19, 4], [11, -16.5, 3.6]]) ovalEdge(x, y, r, r, GULD.mid, GULD.edge);
-      oval(4.5, -15, 8, 3.2, GULD.mid);
-    });
-  }
-  function drawGoldKing(o) {
-    goldPerson(o, () => {
-      poly([[-3, -15], [-2, -25], [2.5, -19], [5.5, -27], [8.5, -19], [13, -25], [14, -15]], GULD.crown, GULD.edge);
-      GULD.gems.forEach((col, k) => blob(1.5 + k * 4.5, -17.5, 1.4, col));
-    });
-  }
-
-  function goldPerson({ beat, dead }, top) {
+  // En person i guld som flyger med gyllene vingar, med krona och gnistor runt sig.
+  function drawGold({ beat, dead }) {
     featherWing(-8, 2, 0.8 + beat, GULD.dark, GULD.edge);
     oval(-14, 13, 7, 3.5, GULD.dark);
     oval(-21, 13.5, 3.6, 3.4, GULD.mid);
@@ -3226,7 +3207,8 @@
 
     ovalEdge(5, -9, 9.5, 9.5, GULD.main, GULD.edge);
     blob(1, -13, 3, GULD.light);
-    top();
+    poly([[-3, -15], [-2, -25], [2.5, -19], [5.5, -27], [8.5, -19], [13, -25], [14, -15]], GULD.crown, GULD.edge);
+    GULD.gems.forEach((col, k) => blob(1.5 + k * 4.5, -17.5, 1.4, col));
     if (dead) {
       xEye(3, -9, 2);
       xEye(10, -9, 2);
@@ -3882,10 +3864,7 @@
     const sections = [], cells = [];
     let y = FIG_PANEL.y + 76;
     const firstTitle = choosingFirst() ? 'Välj din första figur' : `Dina figurer (${owned.length})`;
-    const parts = [[firstTitle, owned, true]];
-    // har man alla figurer behövs ingen rad för dem som är kvar
-    if (missing.length || choosingFirst()) parts.push([`Kvar att få (${missing.length})`, missing, false]);
-    for (const [title, list, mine] of parts) {
+    for (const [title, list, mine] of [[firstTitle, owned, true], [`Kvar att få (${missing.length})`, missing, false]]) {
       sections.push({ title, y });
       y += 20;
       list.forEach((ci, k) => cells.push({
