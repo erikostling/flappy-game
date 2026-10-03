@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 //   GET  → { entries }: de tio bästa, ett namn per rad.
 //   POST { name, score, figure } → { entries }: sparar resultatet om det är namnets
 //        bästa och svarar med den nya listan.
-// Svarar 503 när Supabase inte är kopplad; då sparar spelet listan på enheten.
+// Svarar 503 när Supabase inte är kopplad och 502 när databasen inte svarar.
 
 export const dynamic = 'force-dynamic';
 
@@ -51,13 +51,8 @@ export async function POST(request: Request) {
     return json({ error: 'invalid' }, 400);
   }
 
-  // "Erik" och "erik" är samma namn på listan, precis som i spelet.
-  const { error } = await db.rpc('submit_score', {
-    p_name: name,
-    p_name_key: name.toLocaleLowerCase('sv'),
-    p_score: score,
-    p_figure: figure,
-  });
+  // submit_score behåller namnets bästa resultat; "Erik" och "erik" är samma namn.
+  const { error } = await db.rpc('submit_score', { p_name: name, p_score: score, p_figure: figure });
   if (error) return json({ error: 'unavailable' }, 502);
   try {
     return json({ entries: await topTen(db) });
