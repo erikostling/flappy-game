@@ -132,6 +132,33 @@
     if (document.hidden) ac.suspend().catch(() => {});
     else ac.resume().catch(() => {});
   });
+  // Motorljudet i Car Game: två brummande toner genom ett filter, som går upp i ton med
+  // farten, hörs mer när man gasar och varvar upp i ett hopp och när man gasar på
+  // startlinjen. Det byggs vid första trycket, som musiken, och tystnar med
+  // ljudeffekterna (M) och utanför racet.
+  let engine = null;
+  function startEngine() {
+    if (!CAR || engine || document.hidden) return;
+    try { ac ??= new AudioContext(); } catch { return; }
+    ac.resume().catch(() => {});
+    const low = ac.createOscillator(), high = ac.createOscillator(), filter = ac.createBiquadFilter(), gain = ac.createGain();
+    low.type = 'sawtooth'; high.type = 'square';
+    filter.type = 'lowpass'; filter.Q.value = 4;
+    gain.gain.value = 0;
+    low.connect(filter); high.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+    low.start(); high.start();
+    engine = { low, high, filter, gain };
+  }
+  function stepEngine() {
+    if (!engine) return;
+    const racing = sfxOn && state === 'playing' && !overlay;
+    const rev = (time < startedAt ? (gas() ? 0.35 : 0) : carSpeed / ROAD_SPEED) * (air ? 1.25 : 1);
+    const hz = 42 + 110 * rev, t = ac.currentTime;
+    engine.low.frequency.setTargetAtTime(hz, t, 0.06);
+    engine.high.frequency.setTargetAtTime(hz * 2.02, t, 0.06);
+    engine.filter.frequency.setTargetAtTime(300 + 900 * rev, t, 0.06);
+    engine.gain.gain.setTargetAtTime(racing ? 0.03 + (gas() ? 0.03 : 0) + 0.05 * rev : 0, t, 0.1);
+  }
   function toggleSfx() {
     sfxOn = !sfxOn;
     store('flappy-apa-ljud', sfxOn ? 'på' : 'av');
@@ -372,7 +399,7 @@
     items = []; box = ITEMS.map(() => 0); nextItemAt = CAR ? Infinity : 120; bonus = 0;
     worldStep = 0; worldShownAt = -10;
     powers = []; shield = false; magnetUntil = slowUntil = safeUntil = 0; flash = 0;
-    holds.clear(); drags.clear(); pedals.clear(); swipeTarget = null;
+    holds.clear(); drags.clear(); pedals.clear(); pedalTouch.clear(); stick = null; swipeTarget = null;
   }
 
   // Medan man håller på vänster eller höger sida glider figuren åt det hållet. Ett
@@ -387,18 +414,38 @@
   // I Car Game kör bilen bara medan man trycker: ett finger mot skärmen, eller pil upp,
   // W eller mellanslag. `pedals` är tangenterna som gasar just nu.
   const pedals = new Set();
-  const gas = () => drags.size > 0 || pedals.size > 0;
+  // Med fingret styr man i stället med en spak nere till höger och gasar med en pedal
+  // nere till vänster: vänster halva av skärmen är pedalen och höger halva spaken.
+  // `touchUI` är sant när man senast tryckte med fingret; med musen kör man som ovan.
+  // `stick` är fingret på spaken och hur långt åt sidan den är dragen, från −1 till 1,
+  // och `pedalTouch` fingrarna på pedalen.
+  let touchUI = CAR && matchMedia('(pointer: coarse)').matches, stick = null;
+  const pedalTouch = new Set();
+  const gas = () => drags.size > 0 || pedals.size > 0 || pedalTouch.size > 0;
   const SWIPE = 6; // så många pixlar fingret ska röra sig innan det räknas som ett svep
   const SWIPE_FOLLOW = 0.6, SWIPE_EASE = 6.5;
   let swipeTarget = null;
-  const steering = () => { let d = 0; for (const dir of holds.values()) d += dir; return Math.sign(d); };
+  const steering = () => {
+    let d = 0;
+    for (const dir of holds.values()) d += dir;
+    return Math.max(-1, Math.min(1, Math.sign(d) + (stick?.dx ?? 0)));
+  };
   const clampX = x => Math.max(MIN_X, Math.min(MAX_X, x));
   function hold(id, dir) {
     if (state !== 'playing' || holds.has(id)) return;
     holds.set(id, dir);
     playerX = clampX(playerX + dir * NUDGE);
   }
+  // spaken följer fingret åt sidan, räknat från spakens mitt
+  const STICK_R = 54, KNOB_R = 24;
+  const stickBase = () => ({ x: VX1 - 18 - STICK_R, y: UI_B - 18 - STICK_R });
+  const pedalBox = () => ({ x: VX0 + 18, y: UI_B - 18 - 116, w: 80, h: 116 });
+  function steerStick(e) {
+    if (stick?.id !== e.pointerId) return;
+    stick.dx = Math.max(-1, Math.min(1, (toWorld(e).x - stickBase().x) / STICK_R));
+  }
   function swipe(e) {
+    steerStick(e);
     const d = drags.get(e.pointerId);
     if (!d || state !== 'playing') return;
     if (!d.swiping) {
@@ -992,15 +1039,14 @@
     ctx.beginPath(); ctx.moveTo(x - 2.5, y - 2.5); ctx.lineTo(x + 2.5, y + 2.5); ctx.moveTo(x + 2.5, y - 2.5); ctx.lineTo(x - 2.5, y + 2.5); ctx.stroke();
   }
   // Kryss när figuren har fallit; `color` är kryssens färg, för de mörka ansiktena.
-  // `gaze` är hur långt upp pupillerna tittar: föraren i Car Game tittar framåt på
-  // vägen, som går uppåt på skärmen.
+  // `gaze` är hur långt ner i ansiktet pupillerna tittar (aheadFace).
   let gaze = 0;
   function eyes(dead, y = -9, gap = 4, color = C.ink) {
     for (const ex of [-gap, gap]) {
       if (dead) cross(ex, y, color);
       else {
         oval(ex, y, 3.8, 4.2, C.white);
-        oval(ex, y + 0.5 - gaze, 2, 2.3, C.ink);
+        oval(ex, y + 0.5 + gaze, 2, 2.3, C.ink);
       }
     }
   }
@@ -1852,7 +1898,7 @@
     stroke([[-12, -11], [12, -6]], '#1d1d1d', 1.2);
     oval(-4.5, -8, 4, 3.6, '#1d1d1d');
     if (dead) cross(4.5, -8);
-    else { oval(4.5, -8, 3.6, 4, C.white); oval(4.5, -7.5 - gaze, 2, 2.3, C.ink); }
+    else { oval(4.5, -8, 3.6, 4, C.white); oval(4.5, -7.5 + gaze, 2, 2.3, C.ink); }
     smile(dead, -1.5, '#8a4a2a', 3.5);
   }
   function pirateNape() {
@@ -2202,7 +2248,8 @@
     for (const dx of [-1.8, 0, 1.8]) { ctx.beginPath(); ctx.moveTo(hx + dx, hy - 4.5); ctx.lineTo(hx + dx, hy - 2.5); ctx.stroke(); }
   }
 
-  function drawHead(f, dead, back) {
+  // `ahead` ritar huvudet uppifrån med ansiktet vänt framåt, som föraren i Car Game.
+  function drawHead(f, dead, back, ahead = false) {
     if (f.neck) f.neck(f, back);
     ctx.save();
     if (f.lift) ctx.translate(0, -f.lift);
@@ -2217,6 +2264,23 @@
     if (back) { if (f.nape) f.nape(f); }
     else if (f.face) f.face(f, dead);
     if (f.over) f.over(f, dead, back);
+    // ögonen syns också på den som har mössa eller man
+    if (ahead && f.face) aheadFace(f);
+    ctx.restore();
+  }
+
+  // Ansiktet på ett huvud som syns uppifrån och tittar framåt (uppåt på skärmen): det
+  // ligger hoptryckt och upp och ner vid huvudets främre kant, så att pannan och ögonen
+  // syns och resten är utom synhåll, och pupillerna tittar framåt.
+  const AHEAD = 0.45;
+  function aheadFace(f) {
+    const s = typeof f.skull === 'object' ? f.skull : {}, y = s.y ?? -6, ry = s.ry ?? 13, rim = y - ry;
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(0, y, (s.rx ?? 14.5) + 1, ry + 1, 0, 0, Math.PI * 2); ctx.clip();
+    ctx.translate(0, rim * (1 + AHEAD) + 10); ctx.scale(1, -AHEAD);
+    gaze = 1.9;
+    f.face(f, false);
+    gaze = 0;
     ctx.restore();
   }
 
@@ -3085,6 +3149,52 @@
     }
   }
 
+  // Hastighetsmätaren nere till höger: en visare över en båge från stilla till full fart,
+  // grön, gul och sedan röd, och farten i km/h, där full fart på banan är 300.
+  const KMH = 300 / ROAD_SPEED;
+  function drawSpeedometer() {
+    // med pedalen och spaken står mätaren mellan dem
+    const r = 40, x = touchUI ? W / 2 : VX1 - 18 - r, y = UI_B - 18 - r;
+    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, k = Math.min(1, carSpeed / ROAD_SPEED), a = a0 + (a1 - a0) * k;
+    blob(x, y, r, 'rgba(255,247,224,0.92)');
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineCap = 'round'; ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.beginPath(); ctx.arc(x, y, r - 9, a0, a1); ctx.stroke();
+    if (k > 0.01) {
+      ctx.strokeStyle = k < 0.6 ? '#2bb673' : k < 0.85 ? '#ffb000' : '#e63946';
+      ctx.beginPath(); ctx.arc(x, y, r - 9, a0, a); ctx.stroke();
+    }
+    stroke([[x, y], [x + Math.cos(a) * (r - 13), y + Math.sin(a) * (r - 13)]], C.ink, 3);
+    blob(x, y, 4, C.ink);
+    say(String(Math.round(carSpeed * KMH)), x, y + 17, 15, { fill: C.ink, outline: null });
+    say('km/h', x, y + 29, 9, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+  }
+
+  // Pedalen och spaken för den som kör med fingret. Pedalen är en räfflad platta som
+  // trycks ner och lyser medan man håller den; spaken en rund platta med en knopp som
+  // följer fingret åt sidan.
+  function drawTouchControls() {
+    const p = pedalBox(), down = pedalTouch.size > 0, sink = down ? 5 : 0;
+    rr(p.x, p.y + sink, p.w, p.h - sink, 16);
+    ctx.fillStyle = 'rgba(58,63,71,0.88)'; ctx.fill();
+    ctx.strokeStyle = down ? C.banana : C.ink; ctx.lineWidth = 3; ctx.stroke();
+    for (let k = 0; k < 4; k++) { rr(p.x + 14, p.y + sink + 16 + k * 17, p.w - 28, 8, 4); ctx.fillStyle = '#6b717a'; ctx.fill(); }
+    say('GAS', p.x + p.w / 2, p.y + p.h - 18, 18, { fill: down ? C.banana : C.white });
+    const b = stickBase(), kx = b.x + (stick?.dx ?? 0) * (STICK_R - KNOB_R);
+    blob(b.x, b.y, STICK_R, 'rgba(29,29,29,0.45)');
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(b.x, b.y, STICK_R, 0, Math.PI * 2); ctx.stroke();
+    for (const side of [-1, 1]) {
+      const ax = b.x + side * (STICK_R - 11);
+      poly([[ax + side * 6, b.y], [ax - side * 4, b.y - 8], [ax - side * 4, b.y + 8]], 'rgba(255,255,255,0.75)');
+    }
+    blob(kx, b.y, KNOB_R, stick ? C.banana : '#ececec');
+    ctx.beginPath(); ctx.arc(kx, b.y, KNOB_R, 0, Math.PI * 2); ctx.stroke();
+    blob(kx - 7, b.y - 7, 6, 'rgba(255,255,255,0.6)');
+  }
+
   // Kartan uppe till höger: hela slingan, mållinjen och en prick där bilen är.
   function drawMinimap() {
     const b = { x: VX1 - 14 - 110, y: UI_T + 14, w: 110, h: 80 };
@@ -3122,10 +3232,8 @@
     ctx.fillStyle = red; ctx.fill(); ctx.strokeStyle = dark; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.fillStyle = C.white; ctx.fillRect(-1.5, -33, 3, 18);
     rr(-7, -10, 14, 18, 6); ctx.fillStyle = '#1d1d1d'; ctx.fill();
-    // föraren: figurens huvud, som tittar framåt på vägen
-    gaze = 1.9;
-    ctx.save(); ctx.translate(0, 2); ctx.scale(0.42, 0.42); drawHead(FIGURES[fig], false, false); ctx.restore();
-    gaze = 0;
+    // föraren: figurens huvud uppifrån, som tittar framåt på vägen
+    ctx.save(); ctx.translate(0, 2); ctx.scale(0.42, 0.42); drawHead(FIGURES[fig], false, true, true); ctx.restore();
     ctx.fillStyle = C.white; ctx.font = `10px ${DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(number, 0, 19);
     ctx.restore();
@@ -3532,6 +3640,7 @@
     if (best || !CAR) say(`Rekord ${formatScore(best)}`, W / 2, UI_T + 80, 14, { font: BODY, weight: '800' });
     if (CAR) {
       drawMinimap();
+      drawSpeedometer();
       say(`Plats ${racePlace()} av ${rivals.length + 1}`, W / 2, UI_T + (best ? 100 : 80), 15, { font: BODY, weight: '800', fill: C.banana });
       const left = startedAt - time;
       if (left > -0.6) {
@@ -3541,7 +3650,7 @@
       // står bilen still när tipset har tonat bort påminns man om hur man kör
       else if (left < -3 && state === 'playing' && !gas() && carSpeed < 20) {
         ctx.globalAlpha = 0.6 + Math.sin(time * 5) * 0.4;
-        say('Tryck och håll för att köra!', W / 2, 250, 24, { fill: C.banana });
+        say(touchUI ? 'Håll in gasen för att köra!' : 'Tryck och håll för att köra!', W / 2, 250, 24, { fill: C.banana });
         ctx.globalAlpha = 1;
       }
     }
@@ -3570,14 +3679,17 @@
       say(p.text, p.x ?? playerX, (p.y ?? PLAYER_Y - 105) - k * 40, p.size ?? 24, { fill: p.color ?? C.banana });
     }
     ctx.globalAlpha = 1;
-    drawBoxRow(box, 30, UI_B - 24, { empty: CAR ? '' : 'Samla saker i lådan!' });
+    // med pedalen och spaken ligger lådan ovanför pedalen
+    if (CAR && touchUI) drawTouchControls();
+    drawBoxRow(box, 30, CAR && touchUI ? pedalBox().y - 22 : UI_B - 24, { empty: CAR ? '' : 'Samla saker i lådan!' });
     drawActivePowers();
     ctx.globalAlpha = 1;
     const tip = time - startedAt;
     if (state === 'playing' && tip < 3) {
       ctx.globalAlpha = Math.min(1, 3 - tip);
       // i Car Game mitt på skärmen, under nedräkningen, där lådan inte är i vägen
-      TRACK.tip.split('\n').forEach((line, i) => say(line, W / 2, (CAR ? 300 : PLAYER_Y + 100) + i * 18, 14, { font: BODY, weight: '800' }));
+      const text = CAR && touchUI ? 'Håll in gasen till vänster för att köra\noch styr med spaken till höger' : TRACK.tip;
+      text.split('\n').forEach((line, i) => say(line, W / 2, (CAR ? 300 : PLAYER_Y + 100) + i * 18, 14, { font: BODY, weight: '800' }));
       ctx.globalAlpha = 1;
     }
   }
@@ -3660,7 +3772,8 @@
     e.preventDefault();
     if (access !== 'yes' || window.player?.busy?.()) return;
     canvas.focus({ preventScroll: true });
-    startMusic();
+    startMusic(); startEngine();
+    if (CAR) touchUI = e.pointerType !== 'mouse';
     const p = toWorld(e);
     if (overlay === 'figures') {
       const i = figureAt(p);
@@ -3680,10 +3793,15 @@
       else if (inside(p, settingsBtn())) openOverlay('settings');
       else if (inside(p, scoresBtn())) openOverlay('scores');
     } else if (state === 'playing') {
-      // i Car Game gasar fingret och styr bara när det drar åt sidan
       const r = canvas.getBoundingClientRect();
-      if (!CAR) hold(e.pointerId, e.clientX < r.left + r.width / 2 ? -1 : 1);
-      drags.set(e.pointerId, { startX: e.clientX, swiping: false });
+      if (CAR && touchUI) {
+        if (p.x < W / 2) pedalTouch.add(e.pointerId);
+        else { stick = { id: e.pointerId, dx: 0 }; steerStick(e); }
+      } else {
+        // i Car Game med musen gasar knappen och styr bara när musen drar åt sidan
+        if (!CAR) hold(e.pointerId, e.clientX < r.left + r.width / 2 ? -1 : 1);
+        drags.set(e.pointerId, { startX: e.clientX, swiping: false });
+      }
       // fingret fortsätter att styra också om det glider över länken eller utanför
       try { canvas.setPointerCapture(e.pointerId); } catch {}
     } else if (state === 'over' && time - overAt > 0.6) {
@@ -3695,18 +3813,21 @@
   canvas.addEventListener('pointermove', swipe);
   // Fingret som släpper slutar styra; också om det glider av skärmen.
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    window.addEventListener(type, e => { holds.delete(e.pointerId); drags.delete(e.pointerId); });
+    window.addEventListener(type, e => {
+      holds.delete(e.pointerId); drags.delete(e.pointerId); pedalTouch.delete(e.pointerId);
+      if (stick?.id === e.pointerId) stick = null;
+    });
   }
   const KEY_DIR = { ArrowLeft: -1, KeyA: -1, ArrowRight: 1, KeyD: 1 };
   const PEDALS = ['ArrowUp', 'KeyW', 'Space'];
   window.addEventListener('keyup', e => { holds.delete(e.code); pedals.delete(e.code); });
-  window.addEventListener('blur', () => { holds.clear(); drags.clear(); pedals.clear(); });
+  window.addEventListener('blur', () => { holds.clear(); drags.clear(); pedals.clear(); pedalTouch.clear(); stick = null; });
 
   // Som i Flappy Game: F öppnar Figurer, T Topplistan, och M och N stänger av och
   // sätter på ljudeffekter och musik.
   window.addEventListener('keydown', e => {
     if (access !== 'yes' || window.player?.busy?.()) return;
-    startMusic();
+    startMusic(); startEngine();
     const go = e.code === 'Space' || e.code === 'Enter';
     if (e.code === 'KeyM') { e.preventDefault(); toggleSfx(); return; }
     if (e.code === 'KeyN') { e.preventDefault(); toggleMusic(); return; }
@@ -3740,6 +3861,7 @@
     const dt = last ? Math.min((now - last) / 1000, 1 / 30) : 0;
     last = now;
     update(dt);
+    stepEngine();
     draw();
     // länken tillbaka till spelen ligger över rutornas hörn, så den göms medan en är öppen
     if (backLink && backLink.hidden !== !!overlay) backLink.hidden = !!overlay;
