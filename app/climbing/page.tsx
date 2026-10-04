@@ -12,7 +12,7 @@ export default function ClimbingGame() {
     <main className={styles.screen}>
       <a className={styles.back} href="/">← Spel</a>
       <h1 className={styles.title}>Climbing Game</h1>
-      <img className={styles.hero} src="/spel/climbing-game.png" alt="En figur med hjälm som klättrar på en tegelvägg" width={512} height={512} />
+      <img className={styles.hero} src="/spel/climbing-game.png" alt="Apan från Flappy Game på en tegelvägg" width={512} height={512} />
       <p className={styles.tagline}>Klättra uppför tegelväggen, grepp för grepp.</p>
       <button className={styles.start} type="button" disabled>Kommer snart</button>
     </main>
