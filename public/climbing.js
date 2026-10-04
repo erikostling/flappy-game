@@ -276,6 +276,8 @@
   // 'figures', 'settings' eller 'scores' när en av startskärmens rutor är öppen
   let overlay = null;
   let best = Math.max(0, Math.floor(Number(load('climbing-best')) || 0)), newBest = false;
+  // den högsta världen man har nått, räknad från 0, som startskärmen visar uppe till höger
+  let bestWorld = Math.max(0, Math.floor(Number(load('climbing-varld')) || 0));
   // raden man sparade på topplistan, och vilken plats den fick den här rundan
   let savedEntry = null, placed = 0;
 
@@ -302,12 +304,12 @@
   // `holds` är fingrar och tangenter som håller just nu, med sitt håll.
   //
   // Sveper fingret åt sidan i stället följer figuren med, långsammare än fingret: den
-  // ska halvvägs så långt som fingret har svept (SWIPE_FOLLOW) och glider dit mjukt
+  // ska en bit kortare än fingret har svept (SWIPE_FOLLOW) och glider dit mjukt
   // (SWIPE_EASE). `drags` är fingrarna som ligger mot skärmen: var de började, och från
   // var de styr figuren när de har börjat svepa. `swipeTarget` är dit figuren glider.
   const holds = new Map(), drags = new Map();
   const SWIPE = 6; // så många pixlar fingret ska röra sig innan det räknas som ett svep
-  const SWIPE_FOLLOW = 0.5, SWIPE_EASE = 5;
+  const SWIPE_FOLLOW = 0.6, SWIPE_EASE = 6.5;
   let swipeTarget = null;
   const steering = () => { let d = 0; for (const dir of holds.values()) d += dir; return Math.sign(d); };
   const clampX = x => Math.max(MIN_X, Math.min(MAX_X, x));
@@ -332,6 +334,7 @@
     state = 'falling'; fallVy = -320;
     play('crash', 0.8);
     if (meters() > best) { best = meters(); newBest = true; store('climbing-best', best); }
+    if (worldStep > bestWorld) { bestWorld = worldStep; store('climbing-varld', bestWorld); }
     if (medal >= 0) {
       medalCount[medal]++;
       store('climbing-medaljer', JSON.stringify(Object.fromEntries(MEDALS.map((m, i) => [m.id, medalCount[i]]))));
@@ -2642,6 +2645,7 @@
     drawButton(START_BTN, 'Starta', 34, { pulse: true });
     drawStartButtons();
     drawMedalBadge();
+    drawWorldBadge();
   }
 
   function drawMedal(m, x, y, r) {
@@ -2664,6 +2668,18 @@
   // Medaljsamlingen överst på startskärmen, som i Flappy Game: hur många av varje; de
   // man inte har är bleka.
   const medalBadge = () => ({ x: W / 2 - 58, y: UI_T + 14, w: 116, h: 44 });
+  // Den högsta världen man har nått, uppe till höger, som nivån i Flappy Game.
+  const worldBadge = () => ({ x: VX1 - 14 - 120, y: UI_T + 14, w: 120, h: 44 });
+  function drawWorldBadge() {
+    const b = worldBadge(), w = bestWorld % WORLDS.length;
+    drawButtonFrame(b);
+    say(`Värld ${w + 1}`, b.x + b.w / 2, b.y + 15, 17, { fill: C.ink, outline: null });
+    ctx.font = `800 11px ${BODY}`;
+    let name = WORLDS[w].name;
+    while (ctx.measureText(name).width > b.w - 12 && name.length > 3) name = name.slice(0, -1);
+    say(name === WORLDS[w].name ? name : name + '…', b.x + b.w / 2, b.y + 32, 11, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+  }
+
   function drawMedalBadge() {
     const b = medalBadge();
     drawButtonFrame(b);
