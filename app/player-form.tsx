@@ -1,5 +1,5 @@
 import Script from 'next/script';
-import { scriptUrl } from '@/lib/scripts';
+import { versioned } from '@/lib/versioned';
 
 // Rutan där man skriver sitt namn första gången man spelar, i båda spelen. Namnet går
 // inte att byta sen, och topplistorna sparar under det; public/player.js sköter den.
@@ -17,7 +17,7 @@ export function PlayerForm() {
         </div>
         <p className="entry-note">Namnet syns på topplistan och går inte att byta sen.</p>
       </form>
-      <Script src={scriptUrl('player.js')} strategy="afterInteractive" />
+      <Script src={versioned('player.js')} strategy="afterInteractive" />
     </>
   );
 }

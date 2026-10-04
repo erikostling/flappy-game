@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
-import { scriptUrl } from '@/lib/scripts';
+import { versioned } from '@/lib/versioned';
 import { PlayerForm } from '../player-form';
 
 // Hela spelet ritas på canvasen av public/game.js; sidan ger bara canvasen och
@@ -35,7 +35,7 @@ export default function FlappyGame() {
       </div>
       <a className="back" href="/" id="back">← Spel</a>
       <div className="safe" id="safe" aria-hidden="true" />
-      <Script src={scriptUrl('game.js')} strategy="afterInteractive" />
+      <Script src={versioned('game.js')} strategy="afterInteractive" />
     </main>
   );
 }
