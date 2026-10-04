@@ -17,7 +17,7 @@ const DESCRIPTION = [
   'Flappy Game. Tryck på Starta, mellanslag eller Enter för att börja.',
   'Klicka, tryck eller använd mellanslag för att flyga genom öppningarna mellan hindren.',
   'Första gången väljer du en av tre startfigurer, en gång för alla.',
-  'Andra figurer köper du med blå mynt under Figurer; priset står på varje låst figur, från 3 till 45 blå mynt. Bläddra mellan sidorna med pilarna längst ner eller med vänster- och högerpil.',
+  'Andra figurer köper du med blå mynt under Figurer; priset står på varje låst figur, från 3 till 55 blå mynt. Bläddra mellan sidorna med pilarna längst ner eller med vänster- och högerpil.',
   'Mellan hindren kan du plocka upp en sköld som tar en krock, en magnet som drar till sig saker och slow motion.',
   'Var 20:e poäng flyger du vidare till nästa av tio världar, med egen bakgrund, egna hinder och egen musik, och varje ny värld ger 2 blå mynt.',
   'Från den sjätte världen blir öppningarna smalare och från den åttonde rör sig hindren.',

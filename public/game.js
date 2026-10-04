@@ -121,6 +121,15 @@
     { id: 'haxa', name: 'Häxa', world: 'Spöknatt', flight: 'Häxan flyger på sin kvast', draw: drawWitch },
     { id: 'sjojungfru', name: 'Sjöjungfru', world: 'Havet', flight: 'Sjöjungfrun simmar genom luften', draw: drawMermaid },
     { id: 'snogubbe', name: 'Snögubbe', world: 'Vinter', flight: 'Snögubben flaxar med pinnarmarna', draw: drawSnowman },
+    // åtta egna hjältar, med egna krafter
+    { id: 'natkastaren', name: 'Nätkastaren', world: 'Storstad', flight: 'Nätkastaren svingar sig fram i sina nät', draw: drawNatkastaren },
+    { id: 'plathjalten', name: 'Plåthjälten', world: 'Verkstad', flight: 'Plåthjälten flyger med raketstövlar', draw: drawPlathjalten },
+    { id: 'stenjatten', name: 'Stenjätten', world: 'Berg', flight: 'Stenjätten tar jättehopp', draw: drawStenjatten },
+    { id: 'nattkatten', name: 'Nattkatten', world: 'Natt', flight: 'Nattkatten smyger genom luften', draw: drawNattkatten },
+    { id: 'askflickan', name: 'Åskflickan', world: 'Åskmoln', flight: 'Åskflickan flyger med blixtar', draw: drawAskflickan },
+    { id: 'isblixten', name: 'Isblixten', world: 'Glaciär', flight: 'Isblixten glider på is', draw: drawIsblixten },
+    { id: 'vindhjalten', name: 'Vindhjälten', world: 'Himmel', flight: 'Vindhjälten bärs av vinden', draw: drawVindhjalten },
+    { id: 'eldhjalten', name: 'Eldhjälten', world: 'Vulkan', flight: 'Eldhjälten flyger på eld', draw: drawEldhjalten },
     // en gåva till Wilhelm, som var först på topplistan
     { id: 'guld', name: 'Guldperson', world: 'Guldland', flight: 'Guldpersonen flyger på gyllene vingar', draw: drawGold, gift: 'wilhelm' },
   ];
@@ -541,7 +550,7 @@
   // Priset i blå mynt för varje grupp om fem figurer att köpa: de fem första kostar 3,
   // de fem nästa 5, och så vidare. Först kommer de två andra startfigurerna, sedan
   // resten i samlingens ordning, så priset är detsamma vilken man än valde först.
-  const PRICES = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45], PRICE_GROUP = 5;
+  const PRICES = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], PRICE_GROUP = 5;
   const OTHER_FIGURES = CHARACTERS.filter(c => !c.gift).map(c => c.id).filter(id => !START_FIGURES.includes(id));
   function figurePrice(ci) {
     const id = CHARACTERS[ci].id;
@@ -1010,6 +1019,8 @@
     blackfisk: 'bubble', groda: 'boing', ko: 'moo', hund: 'woof', enhorning: 'chime', sol: 'chime', tomte: 'chime', guld: 'chime', prinsessa: 'chime',
     haj: 'bubble', delfin: 'bubble', sjojungfru: 'bubble', pirat: 'jet', trollkarl: 'chime', haxa: 'woo',
     skoldpadda: 'buzz', nyckelpiga: 'buzz',
+    natkastaren: 'zap', plathjalten: 'jet', stenjatten: 'boing', nattkatten: 'woo',
+    askflickan: 'zap', isblixten: 'chime', vindhjalten: 'wing', eldhjalten: 'fire',
   };
 
   // ---------- Spelets gång ----------
@@ -3250,6 +3261,228 @@
     }
     ctx.strokeStyle = HERO.smile; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.arc(8, -5, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  }
+
+  // ---------- Hjältarna ----------
+
+  // De åtta egna hjältarna flyger som Superhjälten: benen bakåt och en knytnäve framåt.
+  // Var och en har sina färger, sitt huvud, ett märke på bröstet och det som syns runt
+  // den när den flyger.
+  const HJALTE = {
+    natkastaren: { suit: '#2bb673', dark: '#1a7f50', glove: '#1d1d1d', boot: '#1d1d1d' },
+    plathjalten: { suit: '#c3ccd6', dark: '#5f6b77', glove: '#2f6fd6', boot: '#2f6fd6' },
+    stenjatten: { suit: '#8a8f98', dark: '#5c6068', glove: '#8a8f98', boot: '#5c6068' },
+    nattkatten: { suit: '#1d2450', dark: '#0f1430', glove: '#1d2450', boot: '#0f1430' },
+    askflickan: { suit: '#7b3fb8', dark: '#4a2275', glove: '#ffd23f', boot: '#ffd23f', cape: '#ffd23f', capeDark: '#c99400' },
+    isblixten: { suit: '#8fd3ff', dark: '#2f78b8', glove: '#ffffff', boot: '#ffffff' },
+    vindhjalten: { suit: '#2bb6a0', dark: '#1a7f70', glove: '#ffffff', boot: '#1a7f70' },
+    eldhjalten: { suit: '#e8503a', dark: '#b5321f', glove: '#ffd23f', boot: '#ffd23f' },
+  };
+  const HERO_SKIN = '#ffd6b8';
+
+  function flyingHero(h, { boost, dead }, { behind, chest, head }) {
+    if (behind) behind(boost, dead);
+    if (h.cape) {
+      const speed = boost ? 18 : 10, w1 = Math.sin(time * speed) * 3, w2 = Math.sin(time * speed + 1.4) * 4;
+      ctx.beginPath();
+      ctx.moveTo(-2, -4);
+      ctx.quadraticCurveTo(-16, -10 + w1, -32, -6 + w2);
+      ctx.quadraticCurveTo(-28, 2 + w1, -31, 10 + w2);
+      ctx.quadraticCurveTo(-16, 8, -4, 6);
+      ctx.closePath();
+      ctx.fillStyle = h.cape; ctx.fill();
+      ctx.strokeStyle = h.capeDark; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    oval(-14, 13, 7, 3.5, h.dark);
+    oval(-21, 13.5, 3.6, 3.4, h.boot);
+    oval(-16, 9, 8, 3.8, h.suit);
+    oval(-24, 9.5, 4, 3.8, h.boot);
+    ovalEdge(-4, 6, 12, 8, h.suit, h.dark);
+    if (chest) chest();
+    oval(12, 1, 7, 3.2, h.suit);
+    blob(19, 1, 3.6, h.glove);
+    head(dead);
+  }
+  // två ögon i trekvartsprofil, som Superhjältens
+  function heroEyes(dead, y = -10, color = C.white) {
+    if (dead) { xEye(3, y, 2, color === C.white ? C.ink : color); xEye(10, y, 2, color === C.white ? C.ink : color); return; }
+    oval(3, y, 2.2, 2, color); oval(10, y, 2.2, 2, color);
+    blob(3.6, y + 0.3, 1, C.ink); blob(10.6, y + 0.3, 1, C.ink);
+  }
+  function heroSmile(color = '#8a4a2a') {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(8, -5, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  }
+
+  // Nätkastaren: grön dräkt med nät och stora vita ögon, och en tråd från handen
+  function drawNatkastaren(o) {
+    const h = HJALTE.natkastaren;
+    flyingHero(h, o, {
+      behind: boost => { if (boost) { ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(22, 1); ctx.lineTo(40, -14); ctx.stroke(); } },
+      chest: () => {
+        blob(-2, 5, 2.2, '#1d1d1d'); blob(-2, 8.5, 1.6, '#1d1d1d');
+        ctx.strokeStyle = '#1d1d1d'; ctx.lineWidth = 0.9;
+        for (const s of [-1, 1]) for (const dy of [-1.5, 0.5, 2.5]) { ctx.beginPath(); ctx.moveTo(-2, 5.5 + dy * 0.5); ctx.lineTo(-2 + s * 5, 4 + dy * 1.6); ctx.stroke(); }
+      },
+      head: dead => {
+        ovalEdge(5, -9, 9.5, 9.5, h.suit, h.dark);
+        ctx.strokeStyle = h.dark; ctx.lineWidth = 0.8;
+        for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; ctx.beginPath(); ctx.moveTo(5, -9); ctx.lineTo(5 + Math.cos(a) * 9.5, -9 + Math.sin(a) * 9.5); ctx.stroke(); }
+        for (const r of [4, 7]) { ctx.beginPath(); ctx.arc(5, -9, r, 0, Math.PI * 2); ctx.stroke(); }
+        if (dead) { xEye(3, -10, 2.2, '#1d1d1d'); xEye(10, -10, 2.2, '#1d1d1d'); }
+        else { ovalEdge(2.5, -10.5, 3, 3.8, C.white, '#1d1d1d', -0.4); ovalEdge(10, -10.5, 3, 3.8, C.white, '#1d1d1d', 0.4); }
+      },
+    });
+  }
+
+  // Plåthjälten: silverrustning med blått visir och raketstövlar
+  function drawPlathjalten(o) {
+    const h = HJALTE.plathjalten;
+    flyingHero(h, o, {
+      behind: boost => {
+        const f = boost ? 1 : 0.55;
+        poly([[-27, 9.5], [-27 - 10 * f, 7.5], [-27 - 16 * f, 9.5], [-27 - 10 * f, 11.5]], '#ff9f1c');
+        poly([[-27, 9.5], [-27 - 6 * f, 8.5], [-27 - 10 * f, 9.5], [-27 - 6 * f, 10.5]], '#ffe066');
+      },
+      chest: () => { star(-2, 5, 4.5, '#4cf0ff'); blob(-2, 5, 1.6, C.white); },
+      head: dead => {
+        ovalEdge(5, -9, 9.5, 9.5, h.suit, h.dark);
+        rr(0, -14, 13, 9, 3); ctx.fillStyle = '#2f6fd6'; ctx.fill();
+        if (dead) { xEye(3.5, -10.5, 1.8, '#4cf0ff'); xEye(9.5, -10.5, 1.8, '#4cf0ff'); }
+        else { ctx.fillStyle = '#4cf0ff'; rr(2, -11.5, 4, 1.8, 0.9); ctx.fill(); rr(8, -11.5, 4, 1.8, 0.9); ctx.fill(); }
+        oval(1, -15, 3, 1.5, 'rgba(255,255,255,0.6)', -0.4);
+      },
+    });
+  }
+
+  // Stenjätten: stor och grå som berget, med sprickor och orange shorts
+  function drawStenjatten(o) {
+    const h = HJALTE.stenjatten;
+    ctx.save(); ctx.scale(1.12, 1.12);
+    flyingHero(h, o, {
+      chest: () => {
+        oval(-11, 8, 6, 5.5, '#ff8c1a');
+        ctx.strokeStyle = h.dark; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(3, 5); ctx.lineTo(1, 9); ctx.stroke();
+      },
+      head: dead => {
+        ovalEdge(5, -9, 10.5, 10, h.suit, h.dark);
+        ctx.strokeStyle = h.dark; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(-2, -16); ctx.lineTo(1, -12); ctx.lineTo(-1, -8); ctx.stroke();
+        rr(-1, -15, 16, 3.5, 1.7); ctx.fillStyle = h.dark; ctx.fill();
+        if (dead) { xEye(4, -10, 1.8); xEye(10, -10, 1.8); }
+        else { blob(4, -10, 1.7, C.white); blob(10, -10, 1.7, C.white); blob(4.4, -9.8, 0.9, C.ink); blob(10.4, -9.8, 0.9, C.ink); }
+        ctx.strokeStyle = h.dark; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(3, -4); ctx.lineTo(12, -4.5); ctx.stroke();
+      },
+    });
+    ctx.restore();
+  }
+
+  // Nattkatten: mörkblå dräkt med kattöron, guldögon och guldklor
+  function drawNattkatten(o) {
+    const h = HJALTE.nattkatten;
+    flyingHero(h, o, {
+      chest: () => { for (let k = 0; k < 5; k++) poly([[-7 + k * 2.5, 0], [-5 + k * 2.5, 0], [-6 + k * 2.5, 2.5]], '#ffd23f'); },
+      head: dead => {
+        poly([[-1, -15], [0, -23], [5, -17]], h.suit, h.dark);
+        poly([[6, -17], [11, -23], [12, -14]], h.suit, h.dark);
+        ovalEdge(5, -9, 9.5, 9.5, h.suit, h.dark);
+        if (dead) { xEye(3, -10, 2, '#ffd23f'); xEye(10, -10, 2, '#ffd23f'); }
+        else { oval(3, -10, 2.8, 1.2, '#ffd23f', 0.25); oval(10, -10, 2.8, 1.2, '#ffd23f', -0.25); }
+        ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(6.5, -7); ctx.lineTo(6.5, -4); ctx.stroke();
+      },
+    });
+    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+    for (const dy of [-2, 0, 2]) { ctx.beginPath(); ctx.moveTo(22, 1 + dy); ctx.lineTo(25, 1 + dy * 1.4); ctx.stroke(); }
+  }
+
+  // Åskflickan: lila dräkt med blixt, gul mantel och gult hår, och gnistor
+  function drawAskflickan(o) {
+    const h = HJALTE.askflickan;
+    flyingHero(h, o, {
+      behind: (boost, dead) => {
+        if (!boost || dead) return;
+        ctx.strokeStyle = '#ffe066'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+        for (const y of [-6, 12]) { ctx.beginPath(); ctx.moveTo(-30, y); ctx.lineTo(-36, y + 4); ctx.lineTo(-33, y + 5); ctx.lineTo(-40, y + 10); ctx.stroke(); }
+      },
+      chest: () => poly([[0, -1], [-4, 6], [-1, 6], [-3, 12], [3, 3], [0, 3], [2, -1]], '#ffd23f'),
+      head: dead => {
+        oval(-1, -8, 9, 7, '#ffcf5a', 0.3);
+        oval(5, -9, 9.5, 9.5, HERO_SKIN);
+        oval(5, -16, 9, 4.5, '#ffcf5a');
+        heroEyes(dead);
+        heroSmile();
+      },
+    });
+  }
+
+  // Isblixten: ljusblå dräkt med snöflinga, vitt taggigt hår och is efter sig
+  function drawIsblixten(o) {
+    const h = HJALTE.isblixten;
+    flyingHero(h, o, {
+      behind: (boost, dead) => {
+        if (dead) return;
+        for (const [x, y, r] of [[-30, 2, 2.4], [-38, 8, 1.8], [-34, 14, 1.6]]) star(x + Math.sin(time * 6 + x) * 1.5, y, r * (boost ? 1.4 : 1), C.white);
+      },
+      chest: () => {
+        ctx.strokeStyle = C.white; ctx.lineWidth = 1.3;
+        for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; ctx.beginPath(); ctx.moveTo(-2 + Math.cos(a) * 4.5, 5 + Math.sin(a) * 4.5); ctx.lineTo(-2 - Math.cos(a) * 4.5, 5 - Math.sin(a) * 4.5); ctx.stroke(); }
+      },
+      head: dead => {
+        for (const [x, y] of [[-3, -12], [0, -17], [5, -20], [10, -19]]) poly([[x, y + 4], [x - 6, y - 2], [x + 3, y + 1]], C.white, '#b9c8dc');
+        oval(5, -9, 9.5, 9.5, HERO_SKIN);
+        oval(5, -16, 8.5, 3.6, C.white);
+        heroEyes(dead);
+        heroSmile();
+      },
+    });
+  }
+
+  // Vindhjälten: turkos dräkt med virvel, flygglasögon och vind efter sig
+  function drawVindhjalten(o) {
+    const h = HJALTE.vindhjalten;
+    flyingHero(h, o, {
+      behind: (boost, dead) => {
+        if (dead) return;
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+        const w = time * (boost ? 14 : 8);
+        for (const [y, len] of [[-4, 14], [6, 18], [16, 12]]) { ctx.beginPath(); ctx.moveTo(-30, y); ctx.quadraticCurveTo(-30 - len / 2, y - 3 + Math.sin(w + y) * 2, -30 - len, y); ctx.stroke(); }
+      },
+      chest: () => { ctx.strokeStyle = C.white; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(-2, 5, 3.5, 0, Math.PI * 1.5); ctx.stroke(); ctx.beginPath(); ctx.arc(-2, 5, 1.3, Math.PI, Math.PI * 2.4); ctx.stroke(); },
+      head: dead => {
+        oval(5, -9, 9.5, 9.5, HERO_SKIN);
+        oval(4, -16, 9, 4.5, '#6b4423');
+        poly([[-3, -16], [-9, -13], [-2, -12]], '#6b4423');
+        ctx.strokeStyle = '#3a2f33'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(-4, -10.5); ctx.lineTo(0, -10.5); ctx.stroke();
+        if (dead) { xEye(3, -10.5, 2); xEye(10, -10.5, 2); }
+        else { ovalEdge(3, -10.5, 2.8, 2.6, '#ffd23f', '#3a2f33'); ovalEdge(10, -10.5, 2.8, 2.6, '#ffd23f', '#3a2f33'); }
+        heroSmile();
+      },
+    });
+  }
+
+  // Eldhjälten: röd dräkt med låga, hår av eld och eld efter sig
+  function flame(x, y, len, w) {
+    const f = Math.sin(time * 14 + x) * 1.5;
+    poly([[x, y - w], [x - len, y + f], [x, y + w]], '#ff9f1c');
+    poly([[x, y - w * 0.55], [x - len * 0.6, y + f * 0.6], [x, y + w * 0.55]], '#ffe066');
+  }
+  function drawEldhjalten(o) {
+    const h = HJALTE.eldhjalten;
+    flyingHero(h, o, {
+      behind: (boost, dead) => { if (!dead) { flame(-26, 10, boost ? 18 : 10, 3.5); flame(-19, 14, boost ? 14 : 8, 3); } },
+      chest: () => { poly([[-2, -1], [-6, 6], [-2, 11], [2, 6]], '#ffd23f'); poly([[-2, 3], [-4, 7], [-2, 10], [0, 7]], '#ff9f1c'); },
+      head: dead => {
+        if (!dead) { flame(-1, -12, 12, 4); flame(2, -17, 10, 3.5); flame(7, -19, 8, 3); }
+        oval(5, -9, 9.5, 9.5, HERO_SKIN);
+        oval(5, -16, 8.5, 3.6, '#ff9f1c');
+        heroEyes(dead);
+        heroSmile();
+      },
+    });
   }
 
   // En person i guld som flyger med gyllene vingar, med krona och gnistor runt sig.

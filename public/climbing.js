@@ -572,6 +572,15 @@
     { id: 'haxa', name: 'Häxa', fur: '#7b3fb8', dark: '#2a1f3a', light: '#c8f0a8', leg: '#2a1f3a', fingers: false, skull: { rx: 12, ry: 12, color: '#c8f0a8', edge: '#7fb85a' }, behind: witchHair, face: witchFace, nape: witchNape, over: witchHat, body: witchDress },
     { id: 'sjojungfru', name: 'Sjöjungfru', fur: '#ffd9c2', dark: '#1a7f70', light: '#ffd9c2', fingers: false, legs: false, skull: { rx: 12, ry: 12, edge: '#e0a98c' }, face: mermaidFace, nape: mermaidNape, over: mermaidStar, body: mermaidBody, shell: mermaidHair },
     { id: 'snogubbe', name: 'Snögubbe', fur: '#6b4423', dark: '#6b4423', light: '#ffffff', armW: 2.6, twig: true, legs: false, skull: { rx: 12, ry: 11.5, color: '#ffffff', edge: '#b9c8dc' }, face: snowmanFace, over: snowmanHat, body: snowmanBody },
+    // åtta egna hjältar, med egna krafter
+    { id: 'natkastaren', name: 'Nätkastaren', fur: '#2bb673', dark: '#1d1d1d', light: '#2bb673', hand: '#1a7f50', fingers: false, face: webFace, nape: webNape, body: webBody },
+    { id: 'plathjalten', name: 'Plåthjälten', fur: '#c3ccd6', dark: '#2f6fd6', light: '#c3ccd6', edge: '#5f6b77', fingers: false, face: ironFace, nape: ironNape, body: ironBody },
+    { id: 'stenjatten', name: 'Stenjätten', fur: '#8a8f98', dark: '#5c6068', light: '#a4a9b2', armW: 8, skull: { rx: 15.5, ry: 13.5 }, face: stoneFace, nape: stoneNape, body: stoneBody },
+    { id: 'nattkatten', name: 'Nattkatten', fur: '#1d2450', dark: '#ffd23f', light: '#1d2450', foot: '#0f1430', behind: nightEars, face: nightFace, body: nightBody },
+    { id: 'askflickan', name: 'Åskflickan', fur: '#7b3fb8', dark: '#ffd23f', light: '#ffd6b8', hand: '#ffd23f', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: thunderFace, nape: thunderNape, body: thunderBody, shell: thunderCape },
+    { id: 'isblixten', name: 'Isblixten', fur: '#8fd3ff', dark: '#ffffff', light: '#ffd6b8', hand: '#ffffff', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: iceFace, nape: iceNape, over: iceHair, body: iceBody },
+    { id: 'vindhjalten', name: 'Vindhjälten', fur: '#2bb6a0', dark: '#1a7f70', light: '#ffd6b8', hand: '#ffffff', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: windFace, nape: windNape, over: windHair, body: windBody },
+    { id: 'eldhjalten', name: 'Eldhjälten', fur: '#e8503a', dark: '#ffd23f', light: '#ffd6b8', hand: '#ffd23f', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: fireFace, nape: fireNape, over: fireHair, body: fireBody },
     // en gåva till Wilhelm, som var först på Flappy Games topplista; syns bara för den som har den
     { id: 'guld', name: 'Guldperson', fur: '#ffd23f', dark: '#c98f00', light: '#fff1a8', edge: '#8a6200', gift: true, skull: { rx: 13, ry: 12.5 }, face: goldFace, nape: goldShine, over: goldCrown },
   ];
@@ -580,7 +589,7 @@
   // kostar 3, de fem nästa 5, och så vidare. Först kommer de två startfigurerna man
   // inte valde, sedan resten i samlingens ordning.
   const START_FIGURES = ['hund', 'apa', 'enhorning'];
-  const PRICES = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45], PRICE_GROUP = 5;
+  const PRICES = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], PRICE_GROUP = 5;
   const OTHER_FIGURES = FIGURES.filter(f => !f.gift).map(f => f.id).filter(id => !START_FIGURES.includes(id));
   function figurePrice(i) {
     const id = FIGURES[i].id;
@@ -1670,6 +1679,169 @@
   function goldCrown(f) {
     poly([[-9, -15], [-9, -24], [-5, -19], [0, -26], [5, -19], [9, -24], [9, -15]], '#ffe066', f.edge);
     blob(-5, -17.5, 1.4, '#e63946'); blob(0, -18, 1.6, '#2f80ed'); blob(5, -17.5, 1.4, '#2bb673');
+  }
+
+  // ---------- Hjältarna ----------
+
+  // De åtta egna hjältarna, samma som i Flappy Game, med var sitt märke på bröstet.
+  function heroTorso(f, back) {
+    if (f.edge) ovalEdge(-1, 12, 12, 10, f.fur, f.edge); else oval(-1, 12, 12, 10, f.fur);
+    return !back;
+  }
+
+  // Nätkastaren: grön dräkt med nät, stora vita ögon och en spindel på bröstet
+  function webLines(f) {
+    clipOval(0, -6, 14.5, 13, () => {
+      ctx.strokeStyle = f.dark; ctx.lineWidth = 0.8;
+      for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(Math.cos(a) * 16, -6 + Math.sin(a) * 16); ctx.stroke(); }
+      for (const r of [5, 9, 13]) { ctx.beginPath(); ctx.arc(0, -6, r, 0, Math.PI * 2); ctx.stroke(); }
+    });
+  }
+  function webFace(f, dead) {
+    webLines(f);
+    if (dead) eyes(true, -8, 5, f.dark);
+    else { ovalEdge(-5, -8, 4, 5, C.white, f.dark, -0.4); ovalEdge(5, -8, 4, 5, C.white, f.dark, 0.4); }
+  }
+  function webNape(f) { webLines(f); }
+  function spider(x, y, s, color) {
+    blob(x, y, 2.2 * s, color); blob(x, y + 3.5 * s, 1.6 * s, color);
+    ctx.strokeStyle = color; ctx.lineWidth = 0.9 * s;
+    for (const side of [-1, 1]) for (const dy of [-1.5, 0.5, 2.5]) { ctx.beginPath(); ctx.moveTo(x, y + 0.5 * s + dy * 0.5 * s); ctx.lineTo(x + side * 5 * s, y - 1 * s + dy * 1.6 * s); ctx.stroke(); }
+  }
+  function webBody(f, dead, phase, back) {
+    heroTorso(f, back);
+    spider(-1, back ? 9 : 10, back ? 1.6 : 1, f.dark);
+  }
+
+  // Plåthjälten: silverrustning, blått visir, en lysande stjärna och raketer på ryggen
+  function ironFace(f, dead) {
+    rr(-9, -13, 18, 11, 4); ctx.fillStyle = '#2f6fd6'; ctx.fill();
+    if (dead) eyes(true, -8.5, 4, '#4cf0ff');
+    else { ctx.fillStyle = '#4cf0ff'; rr(-7, -9.5, 5, 2.2, 1.1); ctx.fill(); rr(2, -9.5, 5, 2.2, 1.1); ctx.fill(); }
+    oval(-7, -15, 3, 1.5, 'rgba(255,255,255,0.6)', -0.4);
+  }
+  function ironNape(f) {
+    stroke([[0, -18], [0, 5]], f.edge, 1.5);
+    rr(-8, -15, 4, 9, 2); ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fill();
+  }
+  function ironBody(f, dead, phase, back) {
+    heroTorso(f, back);
+    if (back) {
+      for (const x of [-6, 4]) { rr(x - 3, 3, 6, 14, 3); ctx.fillStyle = '#7d8a97'; ctx.fill(); }
+      return;
+    }
+    star(-1, 10, 5, '#4cf0ff'); blob(-1, 10, 1.8, C.white);
+  }
+
+  // Stenjätten: stor och grå som berget, med sprickor och orange shorts
+  function stoneCracks(f) {
+    ctx.strokeStyle = f.dark; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-9, -15); ctx.lineTo(-6, -11); ctx.lineTo(-8, -7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(10, -4); ctx.lineTo(7, -1); ctx.stroke();
+  }
+  function stoneFace(f, dead) {
+    stoneCracks(f);
+    rr(-11, -14, 22, 4, 2); ctx.fillStyle = f.dark; ctx.fill();
+    if (dead) eyes(true, -8, 5);
+    else for (const x of [-5, 5]) { blob(x, -8, 2.2, C.white); blob(x, -7.6, 1.2, C.ink); }
+    ctx.strokeStyle = f.dark; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (dead) ctx.arc(0, 2, 4, 1.15 * Math.PI, 1.85 * Math.PI); else ctx.arc(0, -3, 6, 0.25 * Math.PI, 0.75 * Math.PI);
+    ctx.stroke();
+  }
+  function stoneNape(f) { stoneCracks(f); }
+  function stoneBody(f, dead, phase, back) {
+    ovalEdge(-1, 12, 14, 11, f.fur, f.dark);
+    clipOval(-1, 12, 14, 11, () => { ctx.fillStyle = '#ff8c1a'; ctx.fillRect(-16, 15, 30, 10); });
+    stroke([[-6, 4], [-3, 8], [-5, 11]], f.dark, 1.1);
+  }
+
+  // Nattkatten: mörkblå dräkt med kattöron, guldögon, guldklor och ett halsband
+  function nightEars(f) {
+    poly([[-13, -10], [-11, -24], [-4, -17]], f.fur);
+    poly([[13, -10], [11, -24], [4, -17]], f.fur);
+  }
+  function nightFace(f, dead) {
+    if (dead) eyes(true, -8, 5, '#ffd23f');
+    else { oval(-5, -8, 3.6, 1.6, '#ffd23f', 0.25); oval(5, -8, 3.6, 1.6, '#ffd23f', -0.25); }
+    stroke([[0, -5], [0, -1]], '#ffd23f', 1.2);
+  }
+  function nightBody(f, dead, phase, back) {
+    if (!heroTorso(f, back)) return;
+    for (let k = 0; k < 5; k++) poly([[-7 + k * 3, 3], [-4.5 + k * 3, 3], [-5.75 + k * 3, 6]], '#ffd23f');
+  }
+
+  // Åskflickan: lila dräkt med blixt, gul mantel och gult hår
+  function thunderCape(f, dead, back) {
+    const w = dead ? 0 : Math.sin(time * 6) * 2;
+    poly([[-9, 3], [9, 3], [15 + w, back ? 30 : 34], [-15 + w, back ? 30 : 34]], '#ffd23f', '#c99400');
+  }
+  function thunderFace(f, dead) {
+    ctx.beginPath(); ctx.ellipse(0, -12, 13, 7, 0, Math.PI, Math.PI * 2); ctx.fillStyle = '#ffcf5a'; ctx.fill();
+    oval(-11, -3, 3.5, 8, '#ffcf5a'); oval(11, -3, 3.5, 8, '#ffcf5a');
+    eyes(dead, -7);
+    cheeks(-2.5, '#ff9eb8', 7.5);
+    smile(dead, -1, '#8a4a2a', 3);
+  }
+  function thunderNape() { oval(0, -6, 13, 13, '#ffcf5a'); stroke([[0, -18], [0, 6]], '#d9a32e', 1.2); }
+  function thunderBody(f, dead, phase, back) {
+    if (!heroTorso(f, back)) return;
+    poly([[0, 3], [-4, 11], [-1, 11], [-3, 19], [3, 9], [0, 9], [2, 3]], '#ffd23f');
+  }
+
+  // Isblixten: ljusblå dräkt med snöflinga och vitt taggigt hår
+  function iceHair() {
+    for (const [x, y] of [[-10, -12], [-5, -18], [1, -20], [7, -18], [11, -12]]) poly([[x - 3, y + 5], [x, y - 5], [x + 3, y + 5]], C.white, '#b9c8dc');
+    oval(0, -14, 11, 5, C.white);
+  }
+  function iceFace(f, dead) {
+    eyes(dead, -7);
+    smile(dead, -1, '#8a4a2a', 3.5);
+  }
+  function iceNape() { clipOval(0, -6, 12.5, 12.5, () => oval(0, -4, 13, 12, C.white)); }
+  function iceBody(f, dead, phase, back) {
+    if (!heroTorso(f, back)) return;
+    ctx.strokeStyle = C.white; ctx.lineWidth = 1.4;
+    for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; ctx.beginPath(); ctx.moveTo(-1 + Math.cos(a) * 5, 11 + Math.sin(a) * 5); ctx.lineTo(-1 - Math.cos(a) * 5, 11 - Math.sin(a) * 5); ctx.stroke(); }
+  }
+
+  // Vindhjälten: turkos dräkt med virvel, flygglasögon och brunt hår
+  function windHair() { oval(0, -15, 12, 5.5, '#6b4423'); poly([[3, -19], [9, -23], [8, -16]], '#6b4423'); }
+  function windFace(f, dead) {
+    stroke([[-12.5, -9], [12.5, -9]], '#3a2f33', 1.6);
+    if (dead) eyes(true, -9, 5);
+    else { ovalEdge(-5, -9, 4.2, 3.8, '#ffd23f', '#3a2f33'); ovalEdge(5, -9, 4.2, 3.8, '#ffd23f', '#3a2f33'); }
+    smile(dead, -1, '#8a4a2a', 3.5);
+  }
+  function windNape() {
+    clipOval(0, -6, 12.5, 12.5, () => oval(0, -9, 13, 11, '#6b4423'));
+    stroke([[-12.5, -9], [12.5, -9]], '#3a2f33', 1.6);
+  }
+  function windBody(f, dead, phase, back) {
+    if (!heroTorso(f, back)) return;
+    ctx.strokeStyle = C.white; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.arc(-1, 11, 4.5, 0, Math.PI * 1.5); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-1, 11, 1.6, Math.PI, Math.PI * 2.4); ctx.stroke();
+  }
+
+  // Eldhjälten: röd dräkt med låga och hår av eld som fladdrar
+  function fireHair(f, dead) {
+    for (const [x, h] of [[-9, 10], [-4, 14], [1, 16], [6, 14], [10, 10]]) {
+      const w = dead ? 0 : Math.sin(time * 12 + x) * 1.5;
+      poly([[x - 4, -13], [x + w, -13 - h], [x + 4, -13]], '#ff9f1c');
+      poly([[x - 2, -13], [x + w * 0.6, -13 - h * 0.6], [x + 2, -13]], '#ffe066');
+    }
+    oval(0, -14, 11, 4.5, '#ff9f1c');
+  }
+  function fireFace(f, dead) {
+    eyes(dead, -7);
+    smile(dead, -1, '#8a4a2a', 3.5);
+  }
+  function fireNape() { clipOval(0, -6, 12.5, 12.5, () => oval(0, -6, 13, 11, '#ff9f1c')); }
+  function fireBody(f, dead, phase, back) {
+    if (!heroTorso(f, back)) return;
+    poly([[-1, 3], [-6, 11], [-1, 18], [4, 11]], '#ffd23f');
+    poly([[-1, 8], [-3.5, 12], [-1, 16], [1.5, 12]], '#ff9f1c');
   }
 
   // ---------- Klättraren ----------
