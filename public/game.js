@@ -582,7 +582,14 @@
   // äger namnet på topplistan, vilket servern säger (`ownedNames`). Den blir vald
   // direkt, och startskärmen säger vem den är till tills omgången börjar.
   let giftNote = '', ownedNames = new Set();
+  // Den som gör spelet har alla figurer: enheten som äger namnet MAKER på någon av
+  // topplistorna. Climbing Game gör likadant.
+  const MAKER = 'admin';
   function giveGifts(withSound) {
+    if (!choosingFirst() && ownedNames.has(MAKER) && CHARACTERS.some(c => !unlocked.has(c.id))) {
+      CHARACTERS.forEach(c => unlocked.add(c.id));
+      store('flappy-apa-upplasta', JSON.stringify([...unlocked]));
+    }
     CHARACTERS.forEach((c, ci) => {
       if (choosingFirst() || !c.gift || !ownedNames.has(c.gift) || unlocked.has(c.id)) return;
       unlocked.add(c.id);

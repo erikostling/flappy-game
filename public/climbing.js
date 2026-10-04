@@ -171,12 +171,27 @@
       .slice(0, TOP);
     ownedNames = new Set(Array.isArray(data?.mine) ? data.mine : []);
     listMode = 'ready';
+    giveMakerFigures();
   }
   // Hämtar listan på nytt; går det inte behålls den som redan hämtats.
   async function refreshBoard() {
     try { await scoresRequest(); } catch { if (listMode === 'loading') listMode = 'error'; }
   }
   refreshBoard();
+
+  // Den som gör spelet har alla figurer: enheten som äger namnet MAKER på någon av
+  // topplistorna. Flappy Game gör likadant, och figurerna är desamma i båda spelen.
+  const MAKER = 'admin';
+  function giveMakerFigures() {
+    if (!ownedNames.has(MAKER)) return;
+    const all = FIGURES.map(f => f.id);
+    let bought = [];
+    try { bought = JSON.parse(load('flappy-apa-upplasta') || '[]'); } catch {}
+    if (!Array.isArray(bought)) bought = [];
+    if (all.every(id => bought.includes(id))) return;
+    store('flappy-apa-upplasta', JSON.stringify([...new Set([...bought, ...all])]));
+    ownedIds = readOwned();
+  }
 
   // Går listan inte att hämta går den inte heller att skriva in sig på.
   const qualifies = m => listMode === 'ready' && m > 0 && (topList.length < TOP || m > topList[TOP - 1].score);

@@ -26,7 +26,8 @@ export function playerHash(request: Request) {
   return /^[\w-]{16,100}$/.test(key) ? createHash('sha256').update(key).digest('hex') : null;
 }
 
-// De tio bästa, och vilka namn (i gemener) som hör till den här enheten.
+// De tio bästa, och vilka namn (i gemener) som hör till den här enheten. Ett namn hör
+// till samma enhet i båda spelen, så namnen räknas från båda listorna.
 export async function board(db: Db, hash: string | null, list: Board = FLAPPY) {
   const top = await db
     .from(list.table)
@@ -37,9 +38,11 @@ export async function board(db: Db, hash: string | null, list: Board = FLAPPY) {
   if (top.error) throw top.error;
   const entries = (top.data as Row[]).map(r => ({ name: r.name, score: r.score, figure: r.figure, at: r.created_at }));
   if (!hash) return { entries, mine: [] };
-  const own = await db.from(list.table).select('name_key').eq('owner', hash);
-  if (own.error) throw own.error;
-  return { entries, mine: (own.data as { name_key: string }[]).map(r => r.name_key) };
+  const own = await Promise.all([FLAPPY, CLIMBING].map(l => db.from(l.table).select('name_key').eq('owner', hash)));
+  const failed = own.find(r => r.error);
+  if (failed?.error) throw failed.error;
+  const mine = new Set(own.flatMap(r => (r.data as { name_key: string }[]).map(row => row.name_key)));
+  return { entries, mine: [...mine] };
 }
 
 export const cleanName = (value: unknown) =>
