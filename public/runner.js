@@ -253,11 +253,11 @@
 
   // Medaljer, som Flappy Games för poängen. I Climbing Game för hur högt man kommer i en
   // runda, vid 35, 70 och 120 m; den bästa man når räknas in i samlingen när man faller.
-  // I Car Game för tiden på varvet, under 55, 47 och 41 sekunder (`at` i hundradelar).
+  // I Car Game för tiden på varvet, under 82, 70 och 61 sekunder (`at` i hundradelar).
   const MEDALS = [
-    { id: 'brons', name: 'Bronsmedalj', at: CAR ? 5500 : 35, color: C.medals[2] },
-    { id: 'silver', name: 'Silvermedalj', at: CAR ? 4700 : 70, color: C.medals[1] },
-    { id: 'guld', name: 'Guldmedalj', at: CAR ? 4100 : 120, color: C.medals[0] },
+    { id: 'brons', name: 'Bronsmedalj', at: CAR ? 8200 : 35, color: C.medals[2] },
+    { id: 'silver', name: 'Silvermedalj', at: CAR ? 7000 : 70, color: C.medals[1] },
+    { id: 'guld', name: 'Guldmedalj', at: CAR ? 6100 : 120, color: C.medals[0] },
   ];
   const medalCount = MEDALS.map(m => {
     try { return Math.max(0, Math.floor(Number(JSON.parse(load(`${GAME}-medaljer`) || '{}')[m.id]) || 0)); } catch { return 0; }
@@ -272,9 +272,9 @@
   let time = 0, overAt = 0, climbed = 0, nextSpawnAt = 0, nextMilestone = 0;
   let playerX = W / 2, playerY = PLAYER_Y, fallVy = 0, fallSpin = 0, spinV = 0;
   let obstacles = [], popups = [], startedAt = 0;
-  // Car Game: farten, tiden för varvet i hundradelar, hur långt bilen har kvar att fara
-  // framåt efter en sak, hur mycket den lutar när den svänger, och sakerna på banan
-  let carSpeed = 0, lapTime = 0, surge = 0, steerTilt = 0, lastX = W / 2, raceItems = [];
+  // Car Game: farten, tiden för varvet i hundradelar, hur mycket bilen lutar när den
+  // svänger, de blå mynten på banan, världen man kör i och om vinsten tog en till nästa
+  let carSpeed = 0, lapTime = 0, steerTilt = 0, lastX = W / 2, raceItems = [], raceWorld = 0, unlocked = false;
   // de fyra motståndarna, när man senast krockade med en, och vilken plats man kom på
   let rivals = [], lastBump = -10, place = 0;
   // sakerna på väggen, vad som har hamnat i lådan den här rundan, och metrarna som
@@ -289,8 +289,9 @@
   let medal = -1, medalShownAt = -10;
   // 'figures', 'settings' eller 'scores' när en av startskärmens rutor är öppen
   let overlay = null;
-  // rekordet: högst i Climbing Game, snabbast varv i Car Game (0 = inget än)
-  const BEST_KEY = CAR ? 'car-tid' : `${GAME}-best`;
+  // rekordet: högst i Climbing Game, snabbast varv i Car Game (0 = inget än); 'car-tid'
+  // var rekordet på den kortare banan och gäller inte längre
+  const BEST_KEY = CAR ? 'car-varvtid' : `${GAME}-best`;
   let best = Math.max(0, Math.floor(Number(load(BEST_KEY)) || 0)), newBest = false;
   // den högsta världen man har nått, räknad från 0, som startskärmen visar uppe till höger
   let bestWorld = Math.max(0, Math.floor(Number(load(`${GAME}-varld`)) || 0));
@@ -358,7 +359,8 @@
     state = 'playing'; climbed = 0; nextSpawnAt = CAR ? 300 : 200; nextMilestone = TRACK.milestone;
     playerX = W / 2; playerY = PLAYER_Y; fallVy = 0; fallSpin = 0; spinV = 0;
     obstacles = []; popups = []; newBest = false; placed = 0; startedAt = time;
-    carSpeed = 0; lapTime = 0; surge = 0; steerTilt = 0; lastX = W / 2; place = 0;
+    carSpeed = 0; lapTime = 0; steerTilt = 0; lastX = W / 2; place = 0; unlocked = false;
+    raceWorld = carWorldIndex();
     raceItems = CAR ? placeRaceItems() : [];
     rivals = CAR ? placeRivals() : [];
     // i Car Game börjar man bakom startlinjen, och klockan går först efter nedräkningen
@@ -565,7 +567,7 @@
   // Banan är en sluten slinga, räknad från en jämn kurva och utsträckt så att ett varv
   // är LAP pixlar. CIRCUIT har en punkt var STEP:e pixel längs banans mitt, med
   // riktningen där; vägen framför bilen ritas utifrån dem, och kartan visar hela slingan.
-  const LAP = 16000, STEP = 20, ROADW = 190, ROAD_SPEED = 440, GRASS_SPEED = 160;
+  const LAP = 24000, STEP = 20, ROADW = 230, ROAD_SPEED = 440, GRASS_SPEED = 160;
   const CIRCUIT = (() => {
     const raw = [];
     for (let i = 0; i <= 2400; i++) {
@@ -606,31 +608,19 @@
     return [W / 2 - dx * sn + dy * c, PLAYER_Y - (dx * c + dy * sn)];
   }
 
-  // Sakerna på banan, samma som i de andra spelen men med mest paket. Varje sak man kör
-  // över skjuter bilen framåt, fler vita streck i mittlinjen ju finare saken är
-  // (RACE_STRIPES; en diamant fyra), och ett blått mynt går till kassan. Ibland ligger
-  // tre i en rad tvärs över banan, så att man får välja. DASH är ett streck i
-  // mittlinjen och mellanrummet efter det.
-  const DASH = 80;
-  const RACE_STRIPES = { mynt: 1, banan: 1, paket: 2, stjarna: 3, diamant: 4 };
-  const RACE_WEIGHTS = { mynt: 22, banan: 15, paket: 33, stjarna: 10, diamant: 5, blamynt: 15 };
-  const RACE_KINDS = ITEMS.flatMap((it, i) => Array(RACE_WEIGHTS[it.id] ?? 0).fill(i));
-  const RACE_PICK = () => RACE_KINDS[Math.floor(Math.random() * RACE_KINDS.length)];
+  // De blå mynten på banan, som går till kassan och köper figurer, med en bra bit emellan.
   function placeRaceItems() {
     const out = [];
-    for (let at = 700; at < LAP - 400; at += 260 + Math.random() * 220) {
-      if (Math.random() < 0.25) {
-        for (const lat of [-62, 0, 62]) out.push({ s: at, lat, kind: RACE_PICK() });
-      } else {
-        out.push({ s: at, lat: (Math.random() - 0.5) * (ROADW - 70), kind: RACE_PICK() });
-      }
+    for (let at = 900; at < LAP - 400; at += 1200 + Math.random() * 800) {
+      out.push({ s: at, lat: (Math.random() - 0.5) * (ROADW - 70), kind: BLUE });
     }
     return out;
   }
 
   // Fyra motståndare som kör samma varv, var och en med sin färg, sin förare och sin
-  // fart. De står framför en på startplattan, så att man måste köra om dem; de saktar
-  // in i kurvorna och byter fil ibland. Man börjar START_BEHIND bakom startlinjen, och
+  // fart, som blir RIVAL_GAIN snabbare för varje värld. De står framför en på
+  // startplattan, så att man måste köra om dem; de saktar in i kurvorna och byter fil
+  // ibland. Man börjar START_BEHIND bakom startlinjen, och
   // nedräkningen tar COUNTDOWN sekunder.
   const RIVALS = [
     { color: '#2f80ed', dark: '#1a4f99', top: 418 },
@@ -638,11 +628,11 @@
     { color: '#ff9f1c', dark: '#c76f00', top: 396 },
     { color: '#9b6dff', dark: '#6a43c4', top: 384 },
   ];
-  const START_BEHIND = -280, COUNTDOWN = 2.4;
+  const START_BEHIND = -280, COUNTDOWN = 2.4, RIVAL_GAIN = 2;
   function placeRivals() {
     const drivers = FIGURES.map((_, i) => i).filter(i => i !== figure && !FIGURES[i].gift).sort(() => Math.random() - 0.5);
     return RIVALS.map((r, k) => ({
-      ...r, fig: drivers[k], number: String(k + 2),
+      ...r, top: r.top + RIVAL_GAIN * raceWorld, fig: drivers[k], number: String(k + 2),
       s: -70 * k, lat: (k % 2 ? 1 : -1) * 42, wantLat: (k % 2 ? 1 : -1) * 42, speed: 0, done: false,
     }));
   }
@@ -655,9 +645,8 @@
       r.lat += (r.wantLat - r.lat) * Math.min(1, t * 1.5);
       if (Math.random() < t * 0.3) r.wantLat = (Math.random() - 0.5) * (ROADW - 70);
       if (!r.done && r.s >= LAP) r.done = true;
-      // en krock: bilen tappar fart och knuffas isär från motståndaren, men inte medan
-      // en sak skjuter den framåt
-      if (surge <= 0 && Math.abs(r.s - climbed) < 62 && Math.abs(r.lat - lane) < 34) {
+      // en krock: bilen tappar fart och knuffas isär från motståndaren
+      if (Math.abs(r.s - climbed) < 62 && Math.abs(r.lat - lane) < 34) {
         const side = Math.sign(lane - r.lat) || 1;
         carSpeed = Math.min(carSpeed, r.speed * 0.8);
         shiftCar(side * 4);
@@ -693,11 +682,6 @@
     shiftCar(-curveAt(climbed) * carSpeed * carSpeed * 0.28 * t);
     if (t > 0) steerTilt += (Math.max(-0.35, Math.min(0.35, (playerX - lastX) / t * 0.0025)) - steerTilt) * Math.min(1, t * 10);
     lastX = playerX;
-    // efter en sak far bilen framåt, fort först och sedan saktare, tills den är framme
-    if (surge > 0) {
-      const go = Math.min(surge, Math.max(surge * t * 8, 240 * t));
-      climbed += go; surge -= go;
-    }
     for (const it of raceItems) {
       if (Math.abs(it.s - climbed) < 30 && Math.abs(it.lat - (playerX - W / 2)) < 28) collectRaceItem(it);
     }
@@ -710,26 +694,21 @@
   const lapClock = () => Math.max(0, raceTime());
 
   function collectRaceItem(it) {
-    const item = ITEMS[it.kind];
     it.taken = true;
     box[it.kind]++;
-    if (item.currency) {
-      store('flappy-apa-blamynt', blueCoins() + 1);
-      popups.push({ text: '+1 blått mynt', at: time, x: playerX, y: PLAYER_Y - 60, color: C.blue, size: 16 });
-      play('collect', 0.6, 1.3);
-      return;
-    }
-    const stripes = RACE_STRIPES[item.id] ?? 1;
-    surge += stripes * DASH;
-    popups.push({ text: `${stripes} streck fram!`, at: time, x: playerX, y: PLAYER_Y - 60, life: 1.6, size: 22 });
-    play('collect', 0.6, 1 + stripes * 0.1);
+    store('flappy-apa-blamynt', blueCoins() + 1);
+    popups.push({ text: '+1 blått mynt', at: time, x: playerX, y: PLAYER_Y - 60, color: C.blue, size: 16 });
+    play('collect', 0.6, 1.3);
   }
 
-  // I mål: tiden, rekordet och medaljen, och sedan rutan. Listan hämtas först, så att det
+  // I mål: tiden, rekordet och medaljen, och nästa värld för den som vann. Sedan rutan. Listan hämtas först, så att det
   // går att avgöra om tiden kom in på den.
   function finishRace() {
     lapTime = Math.max(1, raceTime());
     place = 1 + rivals.filter(r => r.done).length;
+    if (place === 1 && raceWorld + 1 < CAR_WORLDS.length && raceWorld + 1 > bestWorld) {
+      bestWorld = raceWorld + 1; unlocked = true; store(`${GAME}-varld`, bestWorld);
+    }
     climbed = LAP;
     state = 'over'; overAt = time;
     if (!best || lapTime < best) { best = lapTime; newBest = true; store(BEST_KEY, best); }
@@ -2806,11 +2785,114 @@
     ctx.restore();
   }
 
-  // Car Games bana, sedd från bilen: gräs med träd och buskar, banan med röda och vita
+  // Car Games världar. Banan är densamma, men marken, vägen, kantstenarna, mittlinjen
+  // och det som står bredvid banan är olika; vinner man ett race kommer man till nästa.
+  // `deco` är två saker bredvid banan, sedda uppifrån, och `h` gör att två intill
+  // varandra inte blir likadana.
+  const tree = (dark, light) => (x, y) => { blob(x, y, 15, dark); blob(x - 4, y - 4, 9, light); };
+  const bush = color => (x, y) => oval(x, y, 13, 8, color);
+  function glow(x, y, r, color) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+  function cactus(x, y) {
+    blob(x, y, 11, '#2d8a4e'); blob(x, y, 6, '#4fb36d');
+    for (let k = 0; k < 8; k++) blob(x + Math.cos(k * Math.PI / 4) * 12, y + Math.sin(k * Math.PI / 4) * 12, 1.6, '#fff3d6');
+  }
+  const rock = (base, light) => (x, y, h) => { oval(x, y, 12, 8, base, h / 160); oval(x - 3, y - 2, 6, 4, light, h / 160); };
+  // en gran uppifrån: taggiga gröna varv med snö i toppen
+  function spikes(x, y, n, r, inner, color, turn = 0) {
+    const p = [];
+    for (let k = 0; k < n * 2; k++) { const a = turn + k * Math.PI / n, d = k % 2 ? inner : r; p.push([x + Math.cos(a) * d, y + Math.sin(a) * d]); }
+    poly(p, color);
+  }
+  function fir(x, y, h) {
+    spikes(x, y, 9, 17, 11, '#2f6b3a', h / 160);
+    spikes(x, y, 7, 10, 6, '#3f8a4a', h / 160 + 0.3);
+    blob(x, y, 3.5, C.white);
+  }
+  function snowman(x, y) {
+    blob(x + 2, y + 2, 12, 'rgba(80,120,160,0.25)');
+    blob(x, y, 11, C.white); blob(x, y, 7, '#eef5fa'); blob(x, y, 5, C.white);
+    blob(x + 5, y, 2, '#ff8c1a');
+  }
+  function palm(x, y, h) {
+    for (let k = 0; k < 6; k++) { const a = h / 160 + k * Math.PI / 3; oval(x + Math.cos(a) * 10, y + Math.sin(a) * 10, 11, 4, '#2f9e44', a); }
+    blob(x, y, 4, '#8a5a2b');
+  }
+  function parasol(x, y, h) {
+    const c = ['#e63946', '#2f80ed', '#ff9f1c'][h % 3];
+    for (let k = 0; k < 8; k++) {
+      const a = h / 160 + k * Math.PI / 4;
+      ctx.fillStyle = k % 2 ? C.white : c;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, 14, a, a + Math.PI / 4); ctx.closePath(); ctx.fill();
+    }
+    blob(x, y, 2.5, C.ink);
+  }
+  const CANDY = ['#ff5e7a', '#4cc9f0', '#ffd23f', '#6fdc8c', '#a78bfa'];
+  function lollipop(x, y, h) {
+    const c = CANDY[h % CANDY.length];
+    blob(x, y, 12, c); blob(x, y, 8.5, C.white); blob(x, y, 5, c); blob(x, y, 2, C.white);
+  }
+  function candy(x, y, h) {
+    const c = CANDY[(h >> 2) % CANDY.length], a = h / 160, cs = Math.cos(a), sn = Math.sin(a);
+    const at = (u, v) => [x + u * cs - v * sn, y + u * sn + v * cs];
+    poly([at(-7, 0), at(-15, -6), at(-15, 6)], c);
+    poly([at(7, 0), at(15, -6), at(15, 6)], c);
+    oval(x, y, 9, 6, c, a); oval(x - 2 * cs, y - 2 * sn, 3, 2, 'rgba(255,255,255,0.7)', a);
+  }
+  function lamp(x, y) { glow(x, y, 30, 'rgba(255,224,102,0.45)'); blob(x, y, 4, '#ffe066'); blob(x, y, 2, C.white); }
+  function lava(x, y, h) {
+    glow(x, y, 26, 'rgba(255,106,26,0.5)');
+    oval(x, y, 14, 9, '#ff6a1a', h / 160); oval(x, y, 7, 4, '#ffd23f', h / 160);
+  }
+  function fern(x, y, h) {
+    for (let k = 0; k < 5; k++) {
+      const a = h / 160 + k * Math.PI * 2 / 5;
+      oval(x + Math.cos(a) * 11, y + Math.sin(a) * 11, 13, 5, '#1f6b2a', a);
+      oval(x + Math.cos(a) * 11, y + Math.sin(a) * 11, 10, 1.2, '#3f9e4a', a);
+    }
+    blob(x, y, 4, '#1a5a24');
+  }
+  function flower(x, y, h) {
+    const c = ['#ff5e9a', '#a78bfa', '#ff9f1c'][h % 3];
+    for (let k = 0; k < 5; k++) { const a = h / 160 + k * Math.PI * 2 / 5; blob(x + Math.cos(a) * 6, y + Math.sin(a) * 6, 5, c); }
+    blob(x, y, 4, '#ffd23f');
+  }
+  function planet(x, y, h) {
+    const c = ['#ff9f1c', '#4cc9f0', '#ff5e7a'][h % 3];
+    blob(x, y, 9, c); blob(x - 3, y - 3, 3, 'rgba(255,255,255,0.5)');
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(x, y, 16, 5, -0.4, 0, Math.PI * 2); ctx.stroke();
+  }
+  function sparkle(x, y, h) {
+    star(x, y, 6, '#fff7c2');
+    blob(x + 14 - h % 28, y + 10 - (h >> 3) % 20, 1.5, C.white);
+    blob(x - 12 + (h >> 4) % 24, y - 12, 1.2, C.white);
+  }
+  const CAR_WORLDS = [
+    { name: 'Gröna dalen', ground: '#5cb83a', road: '#5a5f66', kerb: '#e63946', line: '#f4f1e0', deco: [tree('#3f8a34', '#5cb83a'), bush('#47992a')] },
+    { name: 'Öknen', ground: '#e9c46a', road: '#7d6b57', kerb: '#e76f51', line: '#fff3d6', deco: [cactus, rock('#a08a6a', '#bba584')] },
+    { name: 'Vinterlandet', ground: '#eaf4fb', road: '#6b7785', kerb: '#2f80ed', line: C.white, deco: [fir, snowman] },
+    { name: 'Stranden', ground: '#f6dfa4', road: '#5a5f66', kerb: '#ff9f1c', line: '#f4f1e0', deco: [palm, parasol] },
+    { name: 'Höstskogen', ground: '#b9893f', road: '#5a5f66', kerb: '#e63946', line: '#f4f1e0', deco: [tree('#c0392b', '#e05a47'), tree('#d35400', '#f39c12')] },
+    { name: 'Godislandet', ground: '#ffc2e2', road: '#7b4a2e', kerb: '#ff5e7a', line: '#ffe3f1', deco: [lollipop, candy] },
+    { name: 'Natten', ground: '#1d2b4a', road: '#2f333b', kerb: '#ffd23f', line: '#ffd23f', deco: [lamp, tree('#163a2c', '#1f5240')] },
+    { name: 'Vulkanen', ground: '#3a2a2a', road: '#4a4a50', kerb: '#ff6a1a', line: '#ffb347', deco: [lava, rock('#241818', '#3a2a2a')] },
+    { name: 'Djungeln', ground: '#2f7d32', road: '#5a5f66', kerb: '#ffd23f', line: '#f4f1e0', deco: [fern, flower] },
+    { name: 'Rymden', ground: '#1a1033', road: '#3d3f55', kerb: '#9b6dff', kerb2: '#4cc9f0', line: '#4cc9f0', deco: [planet, sparkle] },
+  ];
+  // den värld man har kommit till, och den som visas: på startskärmen den man har kommit
+  // till, annars den man kör i
+  const carWorldIndex = () => Math.min(bestWorld, CAR_WORLDS.length - 1);
+  const shownCarWorld = () => CAR_WORLDS[state === 'ready' ? carWorldIndex() : raceWorld];
+
+  // Car Games bana, sedd från bilen: marken med världens saker bredvid, banan med
   // kantstenar och streckad mittlinje, och mållinjen vid varje helt varv.
-  const ROAD = { grass: '#5cb83a', grassDark: '#47992a', road: '#5a5f66', line: '#f4f1e0' };
   function drawCircuit() {
-    ctx.fillStyle = ROAD.grass; ctx.fillRect(VX0, VY0, VW, VH);
+    const env = shownCarWorld();
+    ctx.fillStyle = env.ground; ctx.fillRect(VX0, VY0, VW, VH);
     const me = trackAt(climbed);
     const from = Math.floor((climbed - (VY1 - PLAYER_Y) - 80) / STEP) * STEP, to = climbed + (PLAYER_Y - VY0) + 140;
     for (let at = Math.floor(from / 90) * 90; at < to; at += 90) {
@@ -2818,8 +2900,7 @@
       for (const side of [-1, 1]) {
         if ((h >> (side + 2)) % 3 === 0) continue;
         const [x, y] = toScreen(trackPoint(at, side * (ROADW / 2 + 36 + h % 70)), me);
-        if (h % 2) { blob(x, y, 15, '#3f8a34'); blob(x - 4, y - 4, 9, '#5cb83a'); }
-        else oval(x, y, 13, 8, ROAD.grassDark);
+        env.deco[h % 2](x, y, h);
       }
     }
     const left = [], right = [], mid = [];
@@ -2831,17 +2912,17 @@
     ctx.beginPath();
     left.forEach(([, [x, y]], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
     for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][1][0], right[i][1][1]);
-    ctx.closePath(); ctx.fillStyle = ROAD.road; ctx.fill();
+    ctx.closePath(); ctx.fillStyle = env.road; ctx.fill();
     ctx.lineCap = 'butt';
     for (const edge of [left, right]) {
       for (let i = 1; i < edge.length; i++) {
-        ctx.strokeStyle = Math.floor(edge[i][0] / 40) % 2 ? '#e63946' : C.white; ctx.lineWidth = 7;
+        ctx.strokeStyle = Math.floor(edge[i][0] / 40) % 2 ? env.kerb : env.kerb2 ?? C.white; ctx.lineWidth = 7;
         ctx.beginPath(); ctx.moveTo(edge[i - 1][1][0], edge[i - 1][1][1]); ctx.lineTo(edge[i][1][0], edge[i][1][1]); ctx.stroke();
       }
     }
-    ctx.strokeStyle = ROAD.line; ctx.lineWidth = 3;
+    ctx.strokeStyle = env.line; ctx.lineWidth = 3;
     for (let i = 1; i < mid.length; i++) {
-      if (Math.floor(mid[i][0] / (DASH / 2)) % 2) continue;
+      if (Math.floor(mid[i][0] / 40) % 2) continue;
       ctx.beginPath(); ctx.moveTo(mid[i - 1][1][0], mid[i - 1][1][1]); ctx.lineTo(mid[i][1][0], mid[i][1][1]); ctx.stroke();
     }
     // mållinjen: rutigt band tvärs över banan
@@ -3039,7 +3120,7 @@
     drawButton(START_BTN, 'Starta', 34, { pulse: true });
     drawStartButtons();
     drawMedalBadge();
-    if (TRACK.worlds) drawWorldBadge();
+    if (TRACK.worlds || CAR) drawWorldBadge();
   }
 
   function drawMedal(m, x, y, r) {
@@ -3063,16 +3144,18 @@
   // Medaljsamlingen överst på startskärmen, som i Flappy Game: hur många av varje; de
   // man inte har är bleka.
   const medalBadge = () => ({ x: W / 2 - 62, y: UI_T + 14, w: 124, h: 44 });
-  // Den högsta världen man har nått, uppe till höger, som nivån i Flappy Game.
+  // Den högsta världen man har nått, uppe till höger, som nivån i Flappy Game; i Car
+  // Game den man kör i nästa gång.
   const worldBadge = () => ({ x: VX1 - 14 - 120, y: UI_T + 14, w: 120, h: 44 });
   function drawWorldBadge() {
-    const b = worldBadge(), w = bestWorld % WORLDS.length;
+    const list = CAR ? CAR_WORLDS : WORLDS, w = CAR ? carWorldIndex() : bestWorld % WORLDS.length;
+    const b = worldBadge();
     drawButtonFrame(b);
     say(`Värld ${w + 1}`, b.x + b.w / 2, b.y + 15, 17, { fill: C.ink, outline: null });
     ctx.font = `800 11px ${BODY}`;
-    let name = WORLDS[w].name;
+    let name = list[w].name;
     while (ctx.measureText(name).width > b.w - 12 && name.length > 3) name = name.slice(0, -1);
-    say(name === WORLDS[w].name ? name : name + '…', b.x + b.w / 2, b.y + 32, 11, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+    say(name === list[w].name ? name : name + '…', b.x + b.w / 2, b.y + 32, 11, { font: BODY, weight: '800', fill: C.dirt, outline: null });
   }
 
   function drawMedalBadge() {
@@ -3272,7 +3355,8 @@
   const againButton = b => ({ x: b.x, y: b.y + b.h + 12, w: b.w, h: b.h });
   let OVER_BTN = overButton(130, 256), AGAIN_BTN = againButton(OVER_BTN);
   function drawOver() {
-    const pw = 280, ph = placed ? 290 : 256, px = W / 2 - pw / 2, py = 130;
+    // Car Game har en rad till, om världen
+    const extra = CAR ? 26 : 0, pw = 280, ph = (placed ? 290 : 256) + extra, px = W / 2 - pw / 2, py = 130;
     OVER_BTN = overButton(py, ph);
     AGAIN_BTN = againButton(OVER_BTN);
     say(TRACK.crashTitle, W / 2, 94, 52, { fill: C.banana });
@@ -3290,10 +3374,17 @@
     const next = MEDALS[medal + 1];
     if (medal >= 0) drawMedalLine(MEDALS[medal], W / 2, py + 160, 22, MEDALS[medal].name + '!', { fill: C.ink, outline: null });
     else say(`${CAR ? 'Under ' : ''}${formatScore(next.at)} ger en ${next.name.toLowerCase()}`, W / 2, py + 160, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
-    drawBoxRow(box, px + 36, py + 196, { color: C.ink, outline: null, step: 34, empty: CAR ? 'Inga saker den här gången' : 'Lådan är tom' });
-    if (CAR) say(`Du kom ${ordinal(place)} av ${rivals.length + 1}!`, W / 2, py + 232, 18, { fill: place === 1 ? C.banana : C.ink, outline: place === 1 ? C.ink : null });
+    drawBoxRow(box, px + 36, py + 196, { color: C.ink, outline: null, step: 34, empty: CAR ? 'Inga blå mynt den här gången' : 'Lådan är tom' });
+    if (CAR) {
+      say(`Du kom ${ordinal(place)} av ${rivals.length + 1}!`, W / 2, py + 230, 18, { fill: place === 1 ? C.banana : C.ink, outline: place === 1 ? C.ink : null });
+      const last = raceWorld === CAR_WORLDS.length - 1;
+      if (unlocked) say(`Ny värld: ${CAR_WORLDS[raceWorld + 1].name}!`, W / 2, py + 258, 17, { fill: C.banana, outline: C.ink });
+      else if (place === 1 && last) say('Du har klarat alla världar!', W / 2, py + 258, 16, { fill: C.banana, outline: C.ink });
+      else if (!last) say('Kom 1:a så kommer du till en ny värld', W / 2, py + 258, 13, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+      else say(`Värld ${raceWorld + 1}: ${CAR_WORLDS[raceWorld].name}`, W / 2, py + 258, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+    }
     if (TRACK.worlds) say(`Värld ${worldIndex(climbed) + 1}: ${worldAt(climbed).name}`, W / 2, py + 232, 15, { font: BODY, weight: '800', fill: C.dirt, outline: null });
-    if (placed) say(`Plats ${placed} på topplistan!`, W / 2, py + 266, 18, { fill: C.ink, outline: null });
+    if (placed) say(`Plats ${placed} på topplistan!`, W / 2, py + 266 + extra, 18, { fill: C.ink, outline: null });
     ctx.globalAlpha = time - overAt > 0.6 ? 1 : 0.5;
     drawButton(OVER_BTN, 'Gå till startsidan', 24);
     drawButton(AGAIN_BTN, 'Spela igen', 24);
@@ -3308,7 +3399,10 @@
       drawMinimap();
       say(`Plats ${racePlace()} av ${rivals.length + 1}`, W / 2, UI_T + (best ? 100 : 80), 15, { font: BODY, weight: '800', fill: C.banana });
       const left = startedAt - time;
-      if (left > -0.6) say(left > 0 ? String(Math.ceil(left / (COUNTDOWN / 3))) : 'Kör!', W / 2, 250, 72, { fill: C.banana });
+      if (left > -0.6) {
+        say(left > 0 ? String(Math.ceil(left / (COUNTDOWN / 3))) : 'Kör!', W / 2, 250, 72, { fill: C.banana });
+        if (left > 0) say(`Värld ${raceWorld + 1}: ${CAR_WORLDS[raceWorld].name}`, W / 2, 185, 20);
+      }
       // står bilen still när tipset har tonat bort påminns man om hur man kör
       else if (left < -3 && state === 'playing' && !gas() && carSpeed < 20) {
         ctx.globalAlpha = 0.6 + Math.sin(time * 5) * 0.4;
