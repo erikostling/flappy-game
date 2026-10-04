@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const DESCRIPTION = [
   'Climbing Game. Tryck på Starta, mellanslag eller Enter för att börja.',
   'Figuren klättrar uppför en tegelvägg av sig själv.',
-  'Håll på vänster eller höger halva av skärmen, eller håll inne pil- eller A- och D-tangenterna, för att flytta dig åt sidan.',
+  'Svep med fingret åt sidan så följer figuren med, eller håll på vänster eller höger halva av skärmen eller pil- eller A- och D-tangenterna för att glida åt sidan.',
   'Samla mynt, bananer, paket, stjärnor och diamanter på väggen; de lyfter dig fler meter. Blå mynt köper figurer i Flappy Game.',
   'Ibland sitter en kraft på väggen i stället: en sköld som tar en träff, en magnet som drar sakerna till dig och slow motion som saktar ner det som faller.',
   'Väj för blomkrukor och tegelstenar som faller; träffas figuren faller den ner.',

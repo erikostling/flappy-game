@@ -294,19 +294,35 @@
     items = []; box = ITEMS.map(() => 0); nextItemAt = 120; boost = 0;
     worldStep = 0; worldShownAt = -10;
     powers = []; shield = false; magnetUntil = slowUntil = safeUntil = 0; flash = 0;
-    holds.clear();
+    holds.clear(); drags.clear();
   }
 
   // Medan man håller på vänster eller höger sida glider figuren åt det hållet. Ett
   // tryck flyttar den genast en liten bit, så att också ett kort tryck märks.
   // `holds` är fingrar och tangenter som håller just nu, med sitt håll.
-  const holds = new Map();
+  //
+  // Sveper fingret åt sidan i stället följer figuren med, lika långt som fingret.
+  // `drags` är fingrarna som ligger mot skärmen: var de började, och från var de
+  // styr figuren när de har börjat svepa.
+  const holds = new Map(), drags = new Map();
+  const SWIPE = 6; // så många pixlar fingret ska röra sig innan det räknas som ett svep
   const steering = () => { let d = 0; for (const dir of holds.values()) d += dir; return Math.sign(d); };
   const clampX = x => Math.max(MIN_X, Math.min(MAX_X, x));
   function hold(id, dir) {
     if (state !== 'playing' || holds.has(id)) return;
     holds.set(id, dir);
     playerX = clampX(playerX + dir * NUDGE);
+  }
+  function swipe(e) {
+    const d = drags.get(e.pointerId);
+    if (!d || state !== 'playing') return;
+    if (!d.swiping) {
+      if (Math.abs(e.clientX - d.startX) < SWIPE) return;
+      // nu sveper fingret: det slutar glida och flyttar figuren från där den är
+      d.swiping = true; d.fromClientX = e.clientX; d.fromX = playerX;
+      holds.delete(e.pointerId);
+    }
+    playerX = clampX(d.fromX + (e.clientX - d.fromClientX) / scale);
   }
 
   function crash() {
@@ -2893,7 +2909,7 @@
     const tip = time - startedAt;
     if (state === 'playing' && tip < 3) {
       ctx.globalAlpha = Math.min(1, 3 - tip);
-      say('Håll på vänster eller höger sida för att flytta dig', W / 2, PLAYER_Y + 100, 14, { font: BODY, weight: '800' });
+      say('Svep åt sidan eller håll på en sida för att flytta dig', W / 2, PLAYER_Y + 100, 14, { font: BODY, weight: '800' });
       ctx.globalAlpha = 1;
     }
   }
@@ -2999,18 +3015,22 @@
     } else if (state === 'playing') {
       const r = canvas.getBoundingClientRect();
       hold(e.pointerId, e.clientX < r.left + r.width / 2 ? -1 : 1);
+      drags.set(e.pointerId, { startX: e.clientX, swiping: false });
+      // fingret fortsätter att styra också om det glider över länken eller utanför
+      try { canvas.setPointerCapture(e.pointerId); } catch {}
     } else if (state === 'over' && time - overAt > 0.6 && inside(p, OVER_BTN)) {
       toStart();
     }
   });
 
+  canvas.addEventListener('pointermove', swipe);
   // Fingret som släpper slutar styra; också om det glider av skärmen.
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    window.addEventListener(type, e => holds.delete(e.pointerId));
+    window.addEventListener(type, e => { holds.delete(e.pointerId); drags.delete(e.pointerId); });
   }
   const KEY_DIR = { ArrowLeft: -1, KeyA: -1, ArrowRight: 1, KeyD: 1 };
   window.addEventListener('keyup', e => holds.delete(e.code));
-  window.addEventListener('blur', () => holds.clear());
+  window.addEventListener('blur', () => { holds.clear(); drags.clear(); });
 
   // Som i Flappy Game: F öppnar Figurer, T Topplistan, och M och N stänger av och
   // sätter på ljudeffekter och musik.
