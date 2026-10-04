@@ -21,7 +21,7 @@ Topplistan behöver Supabase: kopiera `.env.example` till `.env.local` och fyll 
 |---|---|
 | `app/page.tsx`, `app/page.module.css` | Spelväljaren: ett kort per spel |
 | `app/flappy/page.tsx` | Flappy Game: canvasen och rutan för namn på topplistan |
-| `app/climbing/page.tsx`, `public/climbing.js` | Climbing Game: apan klättrar uppför en tegelvägg och väjer för det som faller; rekordet sparas på enheten |
+| `app/climbing/page.tsx`, `public/climbing.js` | Climbing Game: en figur klättrar uppför en tegelvägg och väjer för det som faller. Figurerna är Flappy Games, ritade som klättrare, och man klättrar med dem man har där. Rekordet sparas på enheten |
 | `app/layout.tsx` | Typsnitt (next/font), titel och viewport |
 | `app/globals.css` | Gemensamma färger och typsnitt, och spelets layout och stil |
 | `public/spel/` | Bilderna på korten i spelväljaren |

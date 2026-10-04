@@ -22,6 +22,7 @@ const DESCRIPTION = [
   'Tryck på vänster eller höger halva av skärmen, eller använd pil- eller A- och D-tangenterna, för att flytta mellan tre spår.',
   'Väj för blomkrukor och tegelstenar som faller; träffas apan faller den ner.',
   'Poängen är hur många meter du har klättrat.',
+  'Under Figurer på startskärmen väljer du vem som klättrar, bland figurerna du har i Flappy Game.',
 ].join(' ');
 
 // Hela spelet, startskärmen också, ritas på canvasen av public/climbing.js.
