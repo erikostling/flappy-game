@@ -149,9 +149,19 @@
     low.start(); high.start();
     engine = { low, high, filter, gain };
   }
+  // Webbläsaren släpper fram ljud först efter ett tryck, och på en mobil räknas det
+  // först när fingret lyfts. Ljudet väcks därför vid varje tryck, släpp och tangent, och
+  // under racet en gång i sekunden, så att motorn hörs också för den som håller gasen
+  // nere från innan startljuset blev grönt.
+  let wokenAt = 0;
+  function wakeAudio() { if (ac && ac.state !== 'running' && !document.hidden) ac.resume().catch(() => {}); }
+  for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown', 'click']) {
+    window.addEventListener(type, wakeAudio, { capture: true, passive: true });
+  }
   function stepEngine() {
     if (!engine) return;
     const racing = sfxOn && state === 'playing' && !overlay;
+    if (racing && time - wokenAt > 1) { wokenAt = time; wakeAudio(); }
     const rev = (time < startedAt ? (gas() ? 0.35 : 0) : carSpeed / ROAD_SPEED) * (air ? 1.25 : 1);
     const hz = 42 + 110 * rev, t = ac.currentTime;
     engine.low.frequency.setTargetAtTime(hz, t, 0.06);
