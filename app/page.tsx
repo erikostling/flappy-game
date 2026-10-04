@@ -23,7 +23,7 @@ const GAMES: { href: string; name: string; text: string; image: string; soon?: b
   {
     href: '/car',
     name: 'Car Game',
-    text: 'Kör så långt du kan utan att krocka.',
+    text: 'Kör ett varv på racerbanan så fort du kan.',
     image: versioned('spel/car-game.png'),
   },
 ];

@@ -1,17 +1,24 @@
 (() => {
-  // Climbing Game: en figur klättrar uppför en tegelvägg av sig själv, och man flyttar
-  // den åt sidorna för att väja för blomkrukor och tegelstenar som faller.
-  // Poängen är hur högt man har klättrat, i meter.
+  // Två spel med samma ramverk: Climbing Game, där en figur klättrar uppför en vägg och
+  // väjer för det som faller, och Car Game, där en figur kör en F1-bil uppför vägen och
+  // kör om bilarna framför. Man styr åt sidorna, samlar saker och krafter, tar medaljer
+  // och kommer in på topplistan likadant i båda; poängen är hur långt man kommer, i
+  // meter. Sidan säger vilket spel det är med data-game på #runner-stage, och TRACKS
+  // längre ner har det som skiljer dem åt.
 
   // Spelet mäts i W×H och skalas så att det får plats, mitt på skärmen. Det som
-  // blir över fylls av mer vägg: VX0–VX1 och VY0–VY1 är det som syns. UI_* är
-  // skärmens kanter innanför notch och hemknapp, som läses från #climb-safe.
+  // blir över fylls av mer vägg eller gräs: VX0–VX1 och VY0–VY1 är det som syns. UI_*
+  // är skärmens kanter innanför notch och hemknapp, som läses från #runner-safe.
   const W = 400, H = 600;
-  // Figuren går att flytta mellan MIN_X och MAX_X; det som faller och sakerna hamnar
-  // var som helst där emellan.
-  const MIN_X = 55, MAX_X = 345, STEER = 260, NUDGE = 10;
+  const GAME = document.getElementById('runner-stage')?.dataset.game === 'car' ? 'car' : 'climbing';
+  const CAR = GAME === 'car';
+  // Figuren går att flytta mellan MIN_X och MAX_X; hindren och sakerna hamnar var som
+  // helst där emellan. I Car Game är det vägen, mellan ROAD_L och ROAD_R.
+  const ROAD_L = 60, ROAD_R = 340, CAR_W = 40, CAR_H = 72;
+  const MIN_X = CAR ? ROAD_L + CAR_W / 2 + 6 : 55, MAX_X = CAR ? ROAD_R - CAR_W / 2 - 6 : 345;
+  const STEER = CAR ? 300 : 260, NUDGE = 10;
   const randomX = () => MIN_X + Math.random() * (MAX_X - MIN_X);
-  const PLAYER_Y = 420, HIT = 15, METER = 40;
+  const PLAYER_Y = CAR ? 470 : 420, HIT = 15, METER = 40;
   const FALL = 170, GRAVITY = 1400;
 
   const C = {
@@ -27,11 +34,11 @@
   const DISPLAY = css.getPropertyValue('--font-display').trim() || 'sans-serif';
   const BODY = css.getPropertyValue('--font-body').trim() || 'sans-serif';
 
-  const stage = document.getElementById('climb-stage');
-  const canvas = document.getElementById('climb');
+  const stage = document.getElementById('runner-stage');
+  const canvas = document.getElementById('runner');
   const ctx = canvas.getContext('2d');
-  const safe = document.getElementById('climb-safe');
-  const backLink = document.getElementById('climb-back');
+  const safe = document.getElementById('runner-safe');
+  const backLink = document.getElementById('runner-back');
 
   let VX0 = 0, VX1 = W, VY0 = 0, VY1 = H, VW = W, VH = H;
   let UI_T = 0, UI_B = H, scale = 1, offX = 0, offY = 0;
@@ -86,7 +93,7 @@
     if (!songBuf) {
       if (!songAsked) {
         songAsked = true;
-        fetch('/musik/glad.mp3')
+        fetch(`/musik/${CAR ? 'strand' : 'glad'}.mp3`)
           .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer(); })
           .then(data => ac.decodeAudioData(data))
           .then(buf => { songBuf = buf; startMusic(); })
@@ -158,7 +165,7 @@
 
   // Varje svar har listan och vilka namn på den som hör till den här enheten.
   async function scoresRequest(body = null) {
-    const res = await fetch('/api/climbing/scores', {
+    const res = await fetch(`/api/${GAME}/scores`, {
       method: body ? 'POST' : 'GET',
       cache: 'no-store',
       headers: { 'x-player-key': deviceKey(), ...(body ? { 'content-type': 'application/json' } : {}) },
@@ -207,7 +214,7 @@
   }
 
   // Går listan inte att hämta går den inte heller att skriva in sig på.
-  const qualifies = m => listMode === 'ready' && m > 0 && (topList.length < TOP || m > topList[TOP - 1].score);
+  const qualifies = m => listMode === 'ready' && m > 0 && (topList.length < TOP || better(m, topList[TOP - 1].score));
 
   // ---------- Sakerna ----------
 
@@ -244,25 +251,30 @@
 
   // ---------- Medaljerna ----------
 
-  // Medaljer för höjden i en runda, som Flappy Games för poängen: brons vid 35 m, silver
-  // vid 70 m och guld vid 120 m. Den bästa man når räknas in i samlingen när man faller.
+  // Medaljer, som Flappy Games för poängen. I Climbing Game för hur högt man kommer i en
+  // runda, vid 35, 70 och 120 m; den bästa man når räknas in i samlingen när man faller.
+  // I Car Game för tiden på varvet, under 55, 47 och 41 sekunder (`at` i hundradelar).
   const MEDALS = [
-    { id: 'brons', name: 'Bronsmedalj', at: 35, color: C.medals[2] },
-    { id: 'silver', name: 'Silvermedalj', at: 70, color: C.medals[1] },
-    { id: 'guld', name: 'Guldmedalj', at: 120, color: C.medals[0] },
+    { id: 'brons', name: 'Bronsmedalj', at: CAR ? 5500 : 35, color: C.medals[2] },
+    { id: 'silver', name: 'Silvermedalj', at: CAR ? 4700 : 70, color: C.medals[1] },
+    { id: 'guld', name: 'Guldmedalj', at: CAR ? 4100 : 120, color: C.medals[0] },
   ];
   const medalCount = MEDALS.map(m => {
-    try { return Math.max(0, Math.floor(Number(JSON.parse(load('climbing-medaljer') || '{}')[m.id]) || 0)); } catch { return 0; }
+    try { return Math.max(0, Math.floor(Number(JSON.parse(load(`${GAME}-medaljer`) || '{}')[m.id]) || 0)); } catch { return 0; }
   });
 
   // ---------- Spelet ----------
 
-  // ready (startskärmen) → playing → falling → over: rutan med höjden och rekordet,
-  // med knapparna Gå till startsidan och Spela igen.
+  // ready (startskärmen) → playing → crashed (figuren faller eller bilen snurrar) →
+  // over: rutan med hur långt man kom och rekordet, med knapparna Gå till startsidan och
+  // Spela igen. `climbed` är hur långt man har kommit, uppför väggen eller längs vägen.
   let state = 'ready';
-  let time = 0, overAt = 0, climbed = 0, nextSpawnAt = 0, nextMilestone = 10;
-  let playerX = W / 2, playerY = PLAYER_Y, fallVy = 0, fallSpin = 0;
-  let falling = [], popups = [], startedAt = 0;
+  let time = 0, overAt = 0, climbed = 0, nextSpawnAt = 0, nextMilestone = 0;
+  let playerX = W / 2, playerY = PLAYER_Y, fallVy = 0, fallSpin = 0, spinV = 0;
+  let obstacles = [], popups = [], startedAt = 0;
+  // Car Game: farten, tiden för varvet i hundradelar, hur mycket bilen lutar när den
+  // svänger, och de blå mynten på banan
+  let carSpeed = 0, lapTime = 0, steerTilt = 0, lastX = W / 2, raceCoins = [];
   // sakerna på väggen, vad som har hamnat i lådan den här rundan, och metrarna som
   // sakerna har gett
   let items = [], box = ITEMS.map(() => 0), nextItemAt = 0, bonus = 0;
@@ -275,23 +287,75 @@
   let medal = -1, medalShownAt = -10;
   // 'figures', 'settings' eller 'scores' när en av startskärmens rutor är öppen
   let overlay = null;
-  let best = Math.max(0, Math.floor(Number(load('climbing-best')) || 0)), newBest = false;
+  // rekordet: högst i Climbing Game, snabbast varv i Car Game (0 = inget än)
+  const BEST_KEY = CAR ? 'car-tid' : `${GAME}-best`;
+  let best = Math.max(0, Math.floor(Number(load(BEST_KEY)) || 0)), newBest = false;
   // den högsta världen man har nått, räknad från 0, som startskärmen visar uppe till höger
-  let bestWorld = Math.max(0, Math.floor(Number(load('climbing-varld')) || 0));
+  let bestWorld = Math.max(0, Math.floor(Number(load(`${GAME}-varld`)) || 0));
   // raden man sparade på topplistan, och vilken plats den fick den här rundan
   let savedEntry = null, placed = 0;
 
-  // höjden: det man har klättrat och det sakerna har gett
+  // hur långt man har kommit: det man har klättrat eller kört och det sakerna har gett
   const meters = () => Math.floor(climbed / METER) + bonus;
-  // Fortare ju högre man kommer: från 2 till 5,5 meter i sekunden.
-  const climbSpeed = () => 80 + Math.min(140, climbed / 40);
-  // Kortare mellan sakerna som faller ju högre man kommer.
-  const spawnGap = () => Math.max(120, 250 - climbed / 50);
+  // Poängen: i Climbing Game hur högt man kom, i meter, och i Car Game tiden för varvet
+  // i hundradels sekunder, där lägst är bäst.
+  const score = () => (CAR ? lapTime : meters());
+  const better = (a, b) => (CAR ? a < b : a > b);
+  const formatScore = v => (CAR ? `${(v / 100).toFixed(1).replace('.', ',')} s` : `${v} m`);
+  const raceTime = () => Math.round((time - startedAt) * 100);
+
+  // Det som skiljer spelen åt. `speed` är hur fort man kommer framåt, i pixlar per
+  // sekund, `gap` hur långt det är till nästa hinder och `itemGap` till nästa sak.
+  // `spawn`, `step` och `drawObstacles` sköter hindren: `step` flyttar dem och svarar
+  // med det som träffade figuren. `crash` och `fall` är det som händer efter en krock,
+  // tills `fall` säger att det är över.
+  const TRACKS = {
+    climbing: {
+      title: 'Climbing Game', crashTitle: 'Du föll!', distanceLabel: 'DU KOM', worlds: true, milestone: 10,
+      tip: 'Svep åt sidan eller håll på en sida för att flytta dig',
+      // fortare ju högre man kommer, från 2 till 5,5 meter i sekunden, och tätare
+      speed: () => 80 + Math.min(140, climbed / 40),
+      gap: () => Math.max(120, 250 - climbed / 50),
+      itemGap: () => 140 + Math.random() * 120,
+      spawn: spawnDrops, step: stepDrops, drawObstacles: drawDrops, drawBackground: drawWall,
+      drawPlayer: (x, y, playing) => drawClimber(x, y, { dead: !playing, back: playing }),
+      drawHero: () => drawClimber(W / 2, 262 + Math.sin(time * 2) * 4, { size: 2.1, reach: Math.sin(time * 4), back: true }),
+      crash() { fallVy = -320; },
+      fall(dt) {
+        fallVy += GRAVITY * dt;
+        playerY += fallVy * dt;
+        fallSpin += dt * 6;
+        for (const f of obstacles) f.y += FALL * dt;
+        return playerY > VY1 + 80;
+      },
+    },
+    car: {
+      title: 'Car Game', crashTitle: 'Mål!', distanceLabel: 'DIN TID', worlds: false, milestone: Infinity,
+      tip: 'Håll dig på banan: svep åt sidan eller håll på en sida',
+      // bilen kör fortare på banan och saktare på gräset (stepRace), och inga hinder
+      speed: () => carSpeed,
+      gap: () => Infinity,
+      itemGap: () => Infinity,
+      spawn() {}, step: stepRace, drawObstacles: drawRaceCoins, drawBackground: drawCircuit,
+      drawPlayer: (x, y) => drawF1(x, y, steerTilt),
+      drawHero: () => {
+        ctx.save();
+        ctx.translate(W / 2, 285 + Math.sin(time * 2) * 3); ctx.scale(1.9, 1.9);
+        drawF1(0, 0, Math.sin(time * 1.5) * 0.06);
+        ctx.restore();
+      },
+      // det finns inga krockar, bara mål (finishRace)
+      crash() {},
+      fall: () => true,
+    },
+  };
+  const TRACK = TRACKS[GAME];
 
   function reset() {
-    state = 'playing'; climbed = 0; nextSpawnAt = 200; nextMilestone = 10;
-    playerX = W / 2; playerY = PLAYER_Y; fallVy = 0; fallSpin = 0;
-    falling = []; popups = []; newBest = false; placed = 0; startedAt = time;
+    state = 'playing'; climbed = 0; nextSpawnAt = CAR ? 300 : 200; nextMilestone = TRACK.milestone;
+    playerX = W / 2; playerY = PLAYER_Y; fallVy = 0; fallSpin = 0; spinV = 0;
+    obstacles = []; popups = []; newBest = false; placed = 0; startedAt = time;
+    carSpeed = 120; lapTime = 0; steerTilt = 0; lastX = W / 2; raceCoins = CAR ? placeRaceCoins() : [];
     medal = -1; medalShownAt = -10;
     items = []; box = ITEMS.map(() => 0); nextItemAt = 120; bonus = 0;
     worldStep = 0; worldShownAt = -10;
@@ -331,13 +395,13 @@
   }
 
   function crash() {
-    state = 'falling'; fallVy = -320;
+    state = 'crashed'; TRACK.crash();
     play('crash', 0.8);
-    if (meters() > best) { best = meters(); newBest = true; store('climbing-best', best); }
-    if (worldStep > bestWorld) { bestWorld = worldStep; store('climbing-varld', bestWorld); }
+    if (meters() > best) { best = meters(); newBest = true; store(BEST_KEY, best); }
+    if (worldStep > bestWorld) { bestWorld = worldStep; store(`${GAME}-varld`, bestWorld); }
     if (medal >= 0) {
       medalCount[medal]++;
-      store('climbing-medaljer', JSON.stringify(Object.fromEntries(MEDALS.map((m, i) => [m.id, medalCount[i]]))));
+      store(`${GAME}-medaljer`, JSON.stringify(Object.fromEntries(MEDALS.map((m, i) => [m.id, medalCount[i]]))));
     }
     // så att listan är färsk när fallet är över och det avgörs om man kom in på den
     refreshBoard();
@@ -345,8 +409,8 @@
 
   function landed() {
     state = 'over'; overAt = time;
-    // det som föll står inte stilla bakom rutan
-    falling = []; items = []; powers = [];
+    // hindren står inte stilla bakom rutan
+    obstacles = []; items = []; powers = [];
     if (newBest) play('fanfare', 0.45);
     saveResult();
   }
@@ -407,17 +471,29 @@
     play('collect', 0.6, 1 + item.value * 0.04);
   }
 
-  function spawn() {
+  // Climbing Games hinder: det som faller, och som hör till världen högst upp på skärmen.
+  function spawnDrops() {
     const [first, second] = worldAt(climbed + PLAYER_Y - VY0).drops;
     const kind = Math.random() < 0.6 ? first : second;
     const x = randomX();
-    falling.push({ kind, x, y: VY0 - 40, spin: Math.random() * 6 });
+    obstacles.push({ kind, x, y: VY0 - 40, spin: Math.random() * 6 });
     // ibland faller två saker samtidigt, en bra bit ifrån varandra
     if (climbed > 1200 && Math.random() < 0.3) {
       let other = randomX();
       while (Math.abs(other - x) < 110) other = randomX();
-      falling.push({ kind: kind === first ? second : first, x: other, y: VY0 - 90, spin: Math.random() * 6 });
+      obstacles.push({ kind: kind === first ? second : first, x: other, y: VY0 - 90, spin: Math.random() * 6 });
     }
+  }
+  function stepDrops(t, v) {
+    let hit = null;
+    for (const f of obstacles) {
+      f.y += (FALL + v) * t;
+      f.spin += t * 4;
+      const dx = f.x - playerX, dy = f.y - (playerY - 4);
+      if (!hit && !f.gone && dx * dx + dy * dy < (HIT + 13) ** 2) hit = f;
+    }
+    obstacles = obstacles.filter(f => f.y < VY1 + 60 && !f.gone);
+    return hit;
   }
 
   function update(dt) {
@@ -426,7 +502,7 @@
     if (state === 'playing') {
       // slow motion saktar ner väggen och det som faller, men inte fingret som styr
       const t = time < slowUntil ? dt * SLOW : dt;
-      const v = climbSpeed();
+      const v = TRACK.speed();
       climbed += v * t;
       playerX = clampX(playerX + steering() * STEER * dt);
       if (swipeTarget !== null) {
@@ -434,11 +510,11 @@
         // när fingret har släppt och figuren har kommit fram slutar den glida
         if (!drags.size && Math.abs(swipeTarget - playerX) < 0.5) swipeTarget = null;
       }
-      if (climbed >= nextSpawnAt) { spawn(); nextSpawnAt = climbed + spawnGap(); }
+      if (climbed >= nextSpawnAt) { TRACK.spawn(); nextSpawnAt = climbed + TRACK.gap(); }
       if (climbed >= nextItemAt) {
         if (Math.random() < POWER_CHANCE) spawnPower();
         else if (Math.random() < ITEM_CHANCE) spawnItem();
-        nextItemAt = climbed + 140 + Math.random() * 120;
+        nextItemAt = climbed + TRACK.itemGap();
       }
       const near = it => Math.abs(it.x - playerX) < 26 && Math.abs(it.y - (playerY - 8)) < 26;
       for (const it of items) {
@@ -452,31 +528,119 @@
         if (near(it)) takePower(it);
       }
       powers = powers.filter(it => !it.taken && it.y < VY1 + 40);
-      for (const f of falling) {
-        f.y += (FALL + v) * t;
-        f.spin += t * 4;
-        const dx = f.x - playerX, dy = f.y - (playerY - 4);
-        if (dx * dx + dy * dy < (HIT + 13) ** 2 && !survives()) { crash(); break; }
-      }
-      falling = falling.filter(f => f.y < VY1 + 60);
-      while (Math.floor(climbed / WORLD_SPAN) > worldStep) { worldStep++; enterWorld(); }
-      // en medalj när höjden når nästa gräns; flera på en gång ger bara den högsta
+      // ett hinder som träffar: skölden tar det, eller så krockar man
+      const hit = TRACK.step(t, v);
+      if (hit) { if (survives()) hit.gone = true; else crash(); }
+      if (TRACK.worlds) while (Math.floor(climbed / WORLD_SPAN) > worldStep) { worldStep++; enterWorld(); }
+      // en medalj när höjden når nästa gräns; flera på en gång ger bara den högsta. I Car
+      // Game kommer medaljen i mål.
       let m = medal;
-      while (m + 1 < MEDALS.length && meters() >= MEDALS[m + 1].at) m++;
+      while (!CAR && m + 1 < MEDALS.length && meters() >= MEDALS[m + 1].at) m++;
       if (m !== medal) { medal = m; medalShownAt = time; play('fanfare', 0.5); }
-      // var tionde meter, utom där en ny värld säger det själv
+      // var tionde meter (var hundrade i bilen), utom där en ny värld säger det själv
       if (meters() >= nextMilestone) {
-        if (nextMilestone % WORLD_METERS) { popups.push({ text: `${nextMilestone} m!`, at: time }); play('score', 0.5); }
-        nextMilestone += 10;
+        if (!TRACK.worlds || nextMilestone % WORLD_METERS) { popups.push({ text: `${nextMilestone} m!`, at: time }); play('score', 0.5); }
+        nextMilestone += TRACK.milestone;
       }
-    } else if (state === 'falling') {
-      fallVy += GRAVITY * dt;
-      playerY += fallVy * dt;
-      fallSpin += dt * 6;
-      for (const f of falling) f.y += FALL * dt;
-      if (playerY > VY1 + 80) landed();
+    } else if (state === 'crashed') {
+      if (TRACK.fall(dt)) landed();
     }
     popups = popups.filter(p => time - p.at < (p.life ?? 1.2));
+  }
+
+  // ---------- Racet i Car Game ----------
+
+  // Banan är en sluten slinga, räknad från en jämn kurva och utsträckt så att ett varv
+  // är LAP pixlar. CIRCUIT har en punkt var STEP:e pixel längs banans mitt, med
+  // riktningen där; vägen framför bilen ritas utifrån dem, och kartan visar hela slingan.
+  const LAP = 16000, STEP = 20, ROADW = 190, ROAD_SPEED = 440, GRASS_SPEED = 160;
+  const CIRCUIT = (() => {
+    const raw = [];
+    for (let i = 0; i <= 2400; i++) {
+      const t = i / 2400 * Math.PI * 2;
+      raw.push([Math.cos(t) + 0.28 * Math.cos(2 * t) - 0.12 * Math.sin(3 * t), 0.62 * Math.sin(t) + 0.18 * Math.sin(2 * t)]);
+    }
+    let total = 0;
+    const acc = [0];
+    for (let i = 1; i < raw.length; i++) { total += Math.hypot(raw[i][0] - raw[i - 1][0], raw[i][1] - raw[i - 1][1]); acc.push(total); }
+    const k = LAP / total, n = LAP / STEP, pts = [];
+    let j = 0;
+    for (let i = 0; i < n; i++) {
+      const want = i / n * total;
+      while (acc[j + 1] < want) j++;
+      const f = (want - acc[j]) / (acc[j + 1] - acc[j]);
+      pts.push({ x: (raw[j][0] + (raw[j + 1][0] - raw[j][0]) * f) * k, y: (raw[j][1] + (raw[j + 1][1] - raw[j][1]) * f) * k });
+    }
+    for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; a.dir = Math.atan2(b.y - a.y, b.x - a.x); }
+    return pts;
+  })();
+  const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
+  // en punkt på banans mitt `s` pixlar från start, med riktningen där
+  function trackAt(s) {
+    const n = CIRCUIT.length, f = ((s / STEP) % n + n) % n, i = Math.floor(f), u = f - i;
+    const a = CIRCUIT[i], b = CIRCUIT[(i + 1) % n];
+    return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, dir: a.dir + wrapAngle(b.dir - a.dir) * u };
+  }
+  // en punkt `lat` pixlar till höger om banans mitt (till vänster om den är negativ)
+  function trackPoint(s, lat) {
+    const p = trackAt(s);
+    return [p.x - Math.sin(p.dir) * lat, p.y + Math.cos(p.dir) * lat];
+  }
+  // hur mycket banan svänger här, i radianer per pixel; positivt åt höger
+  const curveAt = s => wrapAngle(trackAt(s + 40).dir - trackAt(s - 40).dir) / 80;
+  // En punkt på kartan, sedd från bilen: banan där bilen är pekar alltid uppåt.
+  function toScreen([px, py], me) {
+    const dx = px - me.x, dy = py - me.y, c = Math.cos(me.dir), sn = Math.sin(me.dir);
+    return [W / 2 - dx * sn + dy * c, PLAYER_Y - (dx * c + dy * sn)];
+  }
+
+  function placeRaceCoins() {
+    const coins = [];
+    for (let at = 900; at < LAP - 500; at += 500 + Math.random() * 400) {
+      if (Math.random() < 0.7) coins.push({ s: at, lat: (Math.random() - 0.5) * (ROADW - 70) });
+    }
+    return coins;
+  }
+
+  // Bilen kör fortare på banan och saktare på gräset, och i kurvorna drar den utåt, så
+  // att man måste styra emot. Den lutar lite åt det håll den svänger.
+  function stepRace(t) {
+    const lane = playerX - W / 2, onRoad = Math.abs(lane) < ROADW / 2 - 6;
+    carSpeed += ((onRoad ? ROAD_SPEED : GRASS_SPEED) - carSpeed) * Math.min(1, t * (onRoad ? 0.8 : 2.5));
+    playerX = clampX(playerX - curveAt(climbed) * carSpeed * carSpeed * 0.28 * t);
+    if (t > 0) steerTilt += (Math.max(-0.35, Math.min(0.35, (playerX - lastX) / t * 0.0025)) - steerTilt) * Math.min(1, t * 10);
+    lastX = playerX;
+    for (const coin of raceCoins) {
+      if (Math.abs(coin.s - climbed) < 30 && Math.abs(coin.lat - (playerX - W / 2)) < 28) collectRaceCoin(coin);
+    }
+    raceCoins = raceCoins.filter(coin => !coin.taken && coin.s > climbed - 300);
+    if (climbed >= LAP) finishRace();
+    return null;
+  }
+
+  function collectRaceCoin(coin) {
+    coin.taken = true;
+    box[BLUE]++;
+    store('flappy-apa-blamynt', blueCoins() + 1);
+    popups.push({ text: '+1 blått mynt', at: time, x: playerX, y: PLAYER_Y - 60, color: C.blue, size: 16 });
+    play('collect', 0.6, 1.3);
+  }
+
+  // I mål: tiden, rekordet och medaljen, och sedan rutan. Listan hämtas först, så att det
+  // går att avgöra om tiden kom in på den.
+  function finishRace() {
+    lapTime = raceTime();
+    climbed = LAP;
+    state = 'over'; overAt = time;
+    if (!best || lapTime < best) { best = lapTime; newBest = true; store(BEST_KEY, best); }
+    medal = -1;
+    MEDALS.forEach((m, i) => { if (lapTime <= m.at) medal = i; });
+    if (medal >= 0) {
+      medalCount[medal]++;
+      store(`${GAME}-medaljer`, JSON.stringify(Object.fromEntries(MEDALS.map((m, i) => [m.id, medalCount[i]]))));
+    }
+    play(newBest || medal >= 0 ? 'fanfare' : 'chime', 0.5);
+    refreshBoard().then(saveResult);
   }
 
   // ---------- Topplistan efter ett fall ----------
@@ -484,11 +648,11 @@
   // Kommer man in på topplistan sparas resultatet av sig självt, under namnet man
   // valde första gången (public/player.js). Utan namn sparas inget.
   async function saveResult() {
-    const name = window.player?.name?.(), score = meters();
-    if (!name || !qualifies(score)) return;
+    const name = window.player?.name?.(), result = score();
+    if (!name || !qualifies(result)) return;
     try {
-      await scoresRequest({ name, score, figure: FIGURES[figure].id });
-      savedEntry = topList.find(e => nameKey(e.name) === nameKey(name) && e.score === score) ?? null;
+      await scoresRequest({ name, score: result, figure: FIGURES[figure].id });
+      savedEntry = topList.find(e => nameKey(e.name) === nameKey(name) && e.score === result) ?? null;
       placed = savedEntry ? topList.indexOf(savedEntry) + 1 : 0;
       if (placed) play('chime', 0.6);
     } catch {}
@@ -641,10 +805,10 @@
   // den figur man klättrade med senast, annars den man flyger med i Flappy Game,
   // annars den första man har
   const ownedIndex = id => FIGURES.findIndex(f => f.id === id && owned(f.id));
-  let figure = [load('climbing-figur'), load('flappy-apa-figur')].map(ownedIndex).find(i => i >= 0) ?? FIGURES.findIndex(f => owned(f.id));
+  let figure = [load(`${GAME}-figur`), load('flappy-apa-figur')].map(ownedIndex).find(i => i >= 0) ?? FIGURES.findIndex(f => owned(f.id));
   function choose(i) {
     figure = i;
-    store('climbing-figur', FIGURES[i].id);
+    store(`${GAME}-figur`, FIGURES[i].id);
     play('select', 0.4);
   }
 
@@ -2522,6 +2686,121 @@
     });
   }
 
+  // ---------- Hindren och vägen ----------
+
+  // Det som faller i Climbing Game, med en skugga som lyfter det ut från väggen.
+  function drawDrops() {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 5;
+    for (const f of obstacles) (DROPS[f.kind] ?? drawPot)(f.x, f.y, f.spin);
+    ctx.restore();
+  }
+
+  // Car Games bana, sedd från bilen: gräs med träd och buskar, banan med röda och vita
+  // kantstenar och streckad mittlinje, och mållinjen vid varje helt varv.
+  const ROAD = { grass: '#5cb83a', grassDark: '#47992a', road: '#5a5f66', line: '#f4f1e0' };
+  function drawCircuit() {
+    ctx.fillStyle = ROAD.grass; ctx.fillRect(VX0, VY0, VW, VH);
+    const me = trackAt(climbed);
+    const from = Math.floor((climbed - (VY1 - PLAYER_Y) - 80) / STEP) * STEP, to = climbed + (PLAYER_Y - VY0) + 140;
+    for (let at = Math.floor(from / 90) * 90; at < to; at += 90) {
+      const h = hash(Math.round(at / 90) * 13 + 7);
+      for (const side of [-1, 1]) {
+        if ((h >> (side + 2)) % 3 === 0) continue;
+        const [x, y] = toScreen(trackPoint(at, side * (ROADW / 2 + 36 + h % 70)), me);
+        if (h % 2) { blob(x, y, 15, '#3f8a34'); blob(x - 4, y - 4, 9, '#5cb83a'); }
+        else oval(x, y, 13, 8, ROAD.grassDark);
+      }
+    }
+    const left = [], right = [], mid = [];
+    for (let at = from; at <= to; at += STEP) {
+      left.push([at, toScreen(trackPoint(at, -ROADW / 2), me)]);
+      right.push([at, toScreen(trackPoint(at, ROADW / 2), me)]);
+      mid.push([at, toScreen(trackPoint(at, 0), me)]);
+    }
+    ctx.beginPath();
+    left.forEach(([, [x, y]], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][1][0], right[i][1][1]);
+    ctx.closePath(); ctx.fillStyle = ROAD.road; ctx.fill();
+    ctx.lineCap = 'butt';
+    for (const edge of [left, right]) {
+      for (let i = 1; i < edge.length; i++) {
+        ctx.strokeStyle = Math.floor(edge[i][0] / 40) % 2 ? '#e63946' : C.white; ctx.lineWidth = 7;
+        ctx.beginPath(); ctx.moveTo(edge[i - 1][1][0], edge[i - 1][1][1]); ctx.lineTo(edge[i][1][0], edge[i][1][1]); ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = ROAD.line; ctx.lineWidth = 3;
+    for (let i = 1; i < mid.length; i++) {
+      if (Math.floor(mid[i][0] / 40) % 2) continue;
+      ctx.beginPath(); ctx.moveTo(mid[i - 1][1][0], mid[i - 1][1][1]); ctx.lineTo(mid[i][1][0], mid[i][1][1]); ctx.stroke();
+    }
+    // mållinjen: rutigt band tvärs över banan
+    for (let lap = Math.ceil(from / LAP) * LAP; lap <= to; lap += LAP) {
+      for (let row = 0; row < 2; row++) {
+        for (let k = 0; k < 10; k++) {
+          const lat = -ROADW / 2 + k * ROADW / 10;
+          const quad = [trackPoint(lap + row * 9, lat), trackPoint(lap + row * 9, lat + ROADW / 10), trackPoint(lap + row * 9 + 9, lat + ROADW / 10), trackPoint(lap + row * 9 + 9, lat)].map(q => toScreen(q, me));
+          ctx.beginPath(); quad.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
+          ctx.fillStyle = (k + row) % 2 ? C.ink : C.white; ctx.fill();
+        }
+      }
+    }
+  }
+
+  // De blå mynten på banan, där de ligger.
+  function drawRaceCoins() {
+    const me = trackAt(climbed);
+    for (const coin of raceCoins) {
+      if (coin.s < climbed - 200 || coin.s > climbed + 800) continue;
+      const [x, y] = toScreen(trackPoint(coin.s, coin.lat), me);
+      blob(x, y, 16, 'rgba(255,255,255,0.35)');
+      drawItem(BLUE, x, y);
+    }
+  }
+
+  // Kartan uppe till höger: hela slingan, mållinjen och en prick där bilen är.
+  function drawMinimap() {
+    const b = { x: VX1 - 14 - 110, y: UI_T + 14, w: 110, h: 80 };
+    rr(b.x, b.y, b.w, b.h, 12); ctx.fillStyle = 'rgba(255,247,224,0.9)'; ctx.fill();
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.stroke();
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const p of CIRCUIT) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+    const k = Math.min((b.w - 20) / (x1 - x0), (b.h - 20) / (y1 - y0));
+    const map = p => [b.x + b.w / 2 + (p.x - (x0 + x1) / 2) * k, b.y + b.h / 2 + (p.y - (y0 + y1) / 2) * k];
+    ctx.beginPath();
+    CIRCUIT.forEach((p, i) => { const [x, y] = map(p); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+    ctx.closePath(); ctx.strokeStyle = '#5a5f66'; ctx.lineWidth = 5; ctx.lineJoin = 'round'; ctx.stroke();
+    const [sx, sy] = map(CIRCUIT[0]);
+    ctx.fillStyle = C.ink; ctx.fillRect(sx - 1.5, sy - 5, 3, 10);
+    const [px, py] = map(trackAt(climbed));
+    blob(px, py, 4.5, '#e63946'); ctx.strokeStyle = C.white; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(px, py, 4.5, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // Ens egen bil: en röd F1-bil uppifrån, med nosen uppåt, vingar fram och bak, stora
+  // hjul utanför karossen och figuren man har valt i cockpiten, sedd bakifrån.
+  function drawF1(x, y, angle = 0) {
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(angle);
+    const red = '#e63946', dark = '#9e1b25';
+    ctx.fillStyle = '#1d1d1d';
+    for (const [dx, dy, h] of [[-23, -26, 15], [15, -26, 15], [-24, 12, 18], [15, 12, 18]]) { rr(dx, dy, 9, h, 3); ctx.fill(); }
+    rr(-22, -37, 44, 6, 2); ctx.fillStyle = red; ctx.fill(); ctx.strokeStyle = dark; ctx.lineWidth = 1.2; ctx.stroke();
+    rr(-20, 30, 40, 8, 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C.white; ctx.fillRect(-20, 32, 40, 2);
+    ctx.beginPath();
+    ctx.moveTo(-4, -34); ctx.lineTo(4, -34); ctx.lineTo(7, -12); ctx.lineTo(14, -6); ctx.lineTo(14, 18);
+    ctx.lineTo(8, 30); ctx.lineTo(-8, 30); ctx.lineTo(-14, 18); ctx.lineTo(-14, -6); ctx.lineTo(-7, -12); ctx.closePath();
+    ctx.fillStyle = red; ctx.fill(); ctx.strokeStyle = dark; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = C.white; ctx.fillRect(-1.5, -33, 3, 18);
+    rr(-7, -10, 14, 18, 6); ctx.fillStyle = '#1d1d1d'; ctx.fill();
+    // föraren: figurens huvud, bakifrån, som man ser det när bilen kör uppåt
+    ctx.save(); ctx.translate(0, 2); ctx.scale(0.42, 0.42); drawHead(FIGURES[figure], false, true); ctx.restore();
+    ctx.fillStyle = C.white; ctx.font = `10px ${DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('1', 0, 19);
+    ctx.restore();
+  }
+
   function drawPot(x, y, spin) {
     ctx.save();
     ctx.translate(x, y); ctx.rotate(Math.sin(spin) * 0.3);
@@ -2638,14 +2917,14 @@
   }
 
   function drawStart() {
-    drawTitle('Climbing Game', W / 2, 98, 50);
-    if (best) say(`Rekord ${best} m`, W / 2, 146, 20, { fill: C.banana });
-    drawClimber(W / 2, 262 + Math.sin(time * 2) * 4, { size: 2.1, reach: Math.sin(time * 4), back: true });
+    drawTitle(TRACK.title, W / 2, 98, 50);
+    if (best) say(`Rekord ${formatScore(best)}`, W / 2, 146, 20, { fill: C.banana });
+    TRACK.drawHero();
     say(FIGURES[figure].name, W / 2, 372, 22);
     drawButton(START_BTN, 'Starta', 34, { pulse: true });
     drawStartButtons();
     drawMedalBadge();
-    drawWorldBadge();
+    if (TRACK.worlds) drawWorldBadge();
   }
 
   function drawMedal(m, x, y, r) {
@@ -2668,7 +2947,7 @@
 
   // Medaljsamlingen överst på startskärmen, som i Flappy Game: hur många av varje; de
   // man inte har är bleka.
-  const medalBadge = () => ({ x: W / 2 - 58, y: UI_T + 14, w: 116, h: 44 });
+  const medalBadge = () => ({ x: W / 2 - 62, y: UI_T + 14, w: 124, h: 44 });
   // Den högsta världen man har nått, uppe till höger, som nivån i Flappy Game.
   const worldBadge = () => ({ x: VX1 - 14 - 120, y: UI_T + 14, w: 120, h: 44 });
   function drawWorldBadge() {
@@ -2685,11 +2964,12 @@
     const b = medalBadge();
     drawButtonFrame(b);
     MEDALS.forEach((m, i) => {
-      const x = b.x + 16 + i * 34;
+      // plats för tvåsiffriga antal innan nästa medalj
+      const x = b.x + 15 + i * 38;
       ctx.globalAlpha = medalCount[i] ? 1 : 0.35;
-      drawMedal(m, x, b.y + 25, 9);
+      drawMedal(m, x, b.y + 25, 8);
       ctx.globalAlpha = 1;
-      say(String(medalCount[i]), x + 12, b.y + 25, 15, { font: BODY, weight: '800', fill: C.ink, outline: null, align: 'left' });
+      say(String(medalCount[i]), x + 11, b.y + 25, 14, { font: BODY, weight: '800', fill: C.ink, outline: null, align: 'left' });
     });
   }
 
@@ -2864,7 +3144,7 @@
       say(String(i + 1), BOARD.x + 32, y + 14, 16, { fill: C.ink, outline: null });
       drawClimber(BOARD.x + 62, y + 11, { fig: figIndex(e.figure), size: 0.3, reach: 0 });
       say(e.name, BOARD.x + 86, y + 14, 16, { font: BODY, weight: '800', fill: C.ink, outline: null, align: 'left' });
-      say(`${e.score} m`, BOARD.x + BOARD.w - 26, y + 14, 18, { fill: C.ink, outline: null, align: 'right' });
+      say(formatScore(e.score), BOARD.x + BOARD.w - 26, y + 14, 18, { fill: C.ink, outline: null, align: 'right' });
     });
     drawCloseButton(BOARD_CLOSE);
   }
@@ -2880,23 +3160,23 @@
     const pw = 280, ph = placed ? 290 : 256, px = W / 2 - pw / 2, py = 130;
     OVER_BTN = overButton(py, ph);
     AGAIN_BTN = againButton(OVER_BTN);
-    say('Du föll!', W / 2, 94, 52, { fill: C.banana });
+    say(TRACK.crashTitle, W / 2, 94, 52, { fill: C.banana });
     drawPanel({ x: px, y: py, w: pw, h: ph });
-    say('DU KOM', W / 2, py + 30, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
-    say(`${meters()} m`, W / 2, py + 74, 56, { fill: C.ink, outline: null });
+    say(TRACK.distanceLabel, W / 2, py + 30, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+    say(formatScore(score()), W / 2, py + 74, 56, { fill: C.ink, outline: null });
     if (newBest) {
       rr(W / 2 - 70, py + 104, 140, 32, 16);
       ctx.fillStyle = C.banana; ctx.fill();
       ctx.strokeStyle = C.ink; ctx.lineWidth = 3; ctx.stroke();
       say('Nytt rekord!', W / 2, py + 121, 18, { fill: C.ink, outline: null });
     } else {
-      say(`Rekord ${best} m`, W / 2, py + 120, 16, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+      say(`Rekord ${formatScore(best)}`, W / 2, py + 120, 16, { font: BODY, weight: '800', fill: C.dirt, outline: null });
     }
     const next = MEDALS[medal + 1];
     if (medal >= 0) drawMedalLine(MEDALS[medal], W / 2, py + 160, 22, MEDALS[medal].name + '!', { fill: C.ink, outline: null });
-    else say(`${next.at} m ger en ${next.name.toLowerCase()}`, W / 2, py + 160, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
-    drawBoxRow(box, px + 36, py + 196, { color: C.ink, outline: null, step: 34, empty: 'Lådan är tom' });
-    say(`Värld ${worldIndex(climbed) + 1}: ${worldAt(climbed).name}`, W / 2, py + 232, 15, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+    else say(`${CAR ? 'Under ' : ''}${formatScore(next.at)} ger en ${next.name.toLowerCase()}`, W / 2, py + 160, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+    drawBoxRow(box, px + 36, py + 196, { color: C.ink, outline: null, step: 34, empty: CAR ? 'Inga blå mynt den här gången' : 'Lådan är tom' });
+    if (TRACK.worlds) say(`Värld ${worldIndex(climbed) + 1}: ${worldAt(climbed).name}`, W / 2, py + 232, 15, { font: BODY, weight: '800', fill: C.dirt, outline: null });
     if (placed) say(`Plats ${placed} på topplistan!`, W / 2, py + 266, 18, { fill: C.ink, outline: null });
     ctx.globalAlpha = time - overAt > 0.6 ? 1 : 0.5;
     drawButton(OVER_BTN, 'Gå till startsidan', 24);
@@ -2906,9 +3186,10 @@
 
   function drawHud() {
     if (state === 'ready' || state === 'over') return;
-    say(`${meters()} m`, W / 2, UI_T + 46, 44);
-    say(`Rekord ${best} m`, W / 2, UI_T + 80, 14, { font: BODY, weight: '800' });
-    say(`${worldAt(climbed).name} · värld ${worldIndex(climbed) + 1} av ${WORLDS.length}`, W / 2, UI_T + 100, 13, { font: BODY, weight: '800' });
+    say(formatScore(CAR ? raceTime() : meters()), W / 2, UI_T + 46, 44);
+    if (best || !CAR) say(`Rekord ${formatScore(best)}`, W / 2, UI_T + 80, 14, { font: BODY, weight: '800' });
+    if (CAR) drawMinimap();
+    if (TRACK.worlds) say(`${worldAt(climbed).name} · värld ${worldIndex(climbed) + 1} av ${WORLDS.length}`, W / 2, UI_T + 100, 13, { font: BODY, weight: '800' });
     // "Ny värld!" och en ny medalj står uppe till höger, under krafterna, så att de inte
     // skymmer väggen; de tonar bort efter en stund
     const right = VX1 - 16;
@@ -2933,20 +3214,20 @@
       say(p.text, p.x ?? playerX, (p.y ?? PLAYER_Y - 105) - k * 40, p.size ?? 24, { fill: p.color ?? C.banana });
     }
     ctx.globalAlpha = 1;
-    drawBoxRow(box, 30, UI_B - 24, { empty: 'Samla saker i lådan!' });
+    drawBoxRow(box, 30, UI_B - 24, { empty: CAR ? '' : 'Samla saker i lådan!' });
     drawActivePowers();
     ctx.globalAlpha = 1;
     const tip = time - startedAt;
     if (state === 'playing' && tip < 3) {
       ctx.globalAlpha = Math.min(1, 3 - tip);
-      say('Svep åt sidan eller håll på en sida för att flytta dig', W / 2, PLAYER_Y + 100, 14, { font: BODY, weight: '800' });
+      say(TRACK.tip, W / 2, PLAYER_Y + (CAR ? 80 : 100), 14, { font: BODY, weight: '800' });
       ctx.globalAlpha = 1;
     }
   }
 
   // Skärmen för den som inte får spela än, eller medan det kollas.
   function drawLocked() {
-    drawTitle('Climbing Game', W / 2, 150, 50);
+    drawTitle(TRACK.title, W / 2, 150, 50);
     const P = { x: 40, y: 220, w: 320, h: 170 };
     drawPanel(P);
     if (access === 'checking') say('Ett ögonblick…', W / 2, P.y + P.h / 2, 22, { fill: C.ink, outline: null });
@@ -2958,7 +3239,7 @@
   }
 
   function draw() {
-    drawWall();
+    TRACK.drawBackground();
     if (access !== 'yes') { drawLocked(); return; }
     if (state === 'ready') drawStart();
     else {
@@ -2978,13 +3259,12 @@
       // en skugga lyfter det som faller ut från väggen
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 5;
-      for (const f of falling) (DROPS[f.kind] ?? drawPot)(f.x, f.y, f.spin);
+      TRACK.drawObstacles();
       ctx.restore();
-      // uppe på väggen syns den bakifrån; när den faller vänder den sig om. Den blinkar
-      // medan skölden just har tagit en träff.
+      // Figuren blinkar medan skölden just har tagit en träff.
       const playing = state === 'playing';
       if (playing && time < safeUntil && Math.floor(time * 12) % 2 === 0) ctx.globalAlpha = 0.35;
-      drawClimber(playerX, playerY, { dead: !playing, back: playing });
+      TRACK.drawPlayer(playerX, playerY, playing);
       ctx.globalAlpha = 1;
       if (playing && shield) {
         blob(playerX, playerY - 4, 36, 'rgba(120,200,255,0.22)');
