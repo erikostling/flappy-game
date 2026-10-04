@@ -14,7 +14,7 @@ const GAMES: { href: string; name: string; text: string; image: string; soon?: b
   {
     href: '/climbing',
     name: 'Climbing Game',
-    text: 'Klättra uppför tegelväggen, grepp för grepp.',
+    text: 'Klättra uppför tegelväggen så högt du kan.',
     image: '/spel/climbing-game.png',
     soon: true,
   },
