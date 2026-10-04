@@ -226,6 +226,18 @@
     { id: 'blamynt', name: 'Blått mynt', value: 0, weight: 10, draw: drawBlueCoin, currency: true },
   ];
   const ITEM_CHANCE = 0.7, BLUE = ITEMS.findIndex(it => it.currency);
+
+  // Krafter att plocka upp, som i Flappy Game, ibland i stället för en sak. Skölden tar
+  // en träff, magneten drar sakerna till figuren och slow motion saktar ner allt som
+  // faller en stund. `left` är hur mycket som är kvar, från 1 ner till 0.
+  const POWERS = [
+    { id: 'skold', name: 'Sköld', draw: drawShieldIcon, take: () => { shield = true; }, left: () => (shield ? 1 : 0) },
+    { id: 'magnet', name: 'Magnet', secs: 8, draw: drawMagnetIcon,
+      take() { magnetUntil = time + this.secs; }, left() { return Math.max(0, magnetUntil - time) / this.secs; } },
+    { id: 'slow', name: 'Slow motion', secs: 5, draw: drawSnailIcon,
+      take() { slowUntil = time + this.secs; }, left() { return Math.max(0, slowUntil - time) / this.secs; } },
+  ];
+  const POWER_CHANCE = 0.12, SAFE_TIME = 1.2, SLOW = 0.55, MAGNET_R = 150, MAGNET_PULL = 520;
   function pickItem() {
     let r = Math.random() * 100;
     for (let i = 0; i < ITEMS.length; i++) { r -= ITEMS[i].weight; if (r < 0) return i; }
@@ -259,6 +271,9 @@
   let items = [], box = ITEMS.map(() => 0), nextItemAt = 0, boost = 0;
   // världen figuren har klättrat in i den här rundan, och när den kom dit
   let worldStep = 0, worldShownAt = -10;
+  // krafterna på väggen och de som verkar just nu; `safeUntil` är när figuren slutar
+  // blinka efter att skölden tog en träff
+  let powers = [], shield = false, magnetUntil = 0, slowUntil = 0, safeUntil = 0, flash = 0;
   // den bästa medaljen den här rundan (-1 för ingen), och när den kom
   let medal = -1, medalShownAt = -10;
   // 'figures', 'settings' och 'scores' är rutorna på startskärmen; 'entry' är namnrutan
@@ -280,6 +295,7 @@
     medal = -1; medalShownAt = -10;
     items = []; box = ITEMS.map(() => 0); nextItemAt = 120; boost = 0;
     worldStep = 0; worldShownAt = -10;
+    powers = []; shield = false; magnetUntil = slowUntil = safeUntil = 0; flash = 0;
     holds.clear();
   }
 
@@ -310,7 +326,7 @@
   function landed() {
     state = 'over'; overAt = time;
     // det som föll står inte stilla bakom rutan
-    falling = []; items = [];
+    falling = []; items = []; powers = [];
     if (newBest) play('fanfare', 0.45);
     if (qualifies(meters())) openEntry();
   }
@@ -320,6 +336,35 @@
     store('flappy-apa-blamynt', blueCoins() + WORLD_BONUS);
     box[BLUE] += WORLD_BONUS;
     play('chime', 0.7);
+  }
+
+  function spawnPower() {
+    powers.push({ kind: Math.floor(Math.random() * POWERS.length), x: randomX(), y: VY0 - 30, phase: Math.random() * 6 });
+  }
+
+  function takePower(it) {
+    const pw = POWERS[it.kind];
+    it.taken = true;
+    pw.take();
+    popups.push({ text: pw.name + '!', at: time, x: it.x, y: playerY - 50, color: C.white, size: 18 });
+    play('chime', 0.7);
+  }
+
+  // Skölden tar en träff: figuren blinkar en stund och kan inte träffas under tiden.
+  function survives() {
+    if (time < safeUntil) return true;
+    if (!shield) return false;
+    shield = false; safeUntil = time + SAFE_TIME; flash = 0.6;
+    popups.push({ text: 'Skölden höll!', at: time, x: playerX, y: playerY - 60, color: C.blue, size: 18 });
+    play('swish', 0.6);
+    return true;
+  }
+
+  // Magneten drar en sak som är nära mot figuren.
+  function pull(it, dt) {
+    if (time >= magnetUntil) return;
+    const dx = playerX - it.x, dy = playerY - 8 - it.y, d = Math.hypot(dx, dy);
+    if (d < MAGNET_R && d > 1) { const step = Math.min(d, MAGNET_PULL * dt); it.x += dx / d * step; it.y += dy / d * step; }
   }
 
   function spawnItem() {
@@ -357,28 +402,39 @@
 
   function update(dt) {
     time += dt;
+    flash = Math.max(0, flash - dt * 2);
     if (state === 'playing') {
+      // slow motion saktar ner väggen och det som faller, men inte fingret som styr
+      const t = time < slowUntil ? dt * SLOW : dt;
       const v = climbSpeed();
       // metrarna från en sak klättras på en kort stund, så att väggen rusar förbi
-      const lift = Math.min(boost, Math.max(300, boost * 5) * dt);
+      const lift = Math.min(boost, Math.max(300, boost * 5) * t);
       boost -= lift;
-      climbed += v * dt + lift;
+      climbed += v * t + lift;
       playerX = clampX(playerX + steering() * STEER * dt);
       if (climbed >= nextSpawnAt) { spawn(); nextSpawnAt = climbed + spawnGap(); }
       if (climbed >= nextItemAt) {
-        if (Math.random() < ITEM_CHANCE) spawnItem();
+        if (Math.random() < POWER_CHANCE) spawnPower();
+        else if (Math.random() < ITEM_CHANCE) spawnItem();
         nextItemAt = climbed + 140 + Math.random() * 120;
       }
+      const near = it => Math.abs(it.x - playerX) < 26 && Math.abs(it.y - (playerY - 8)) < 26;
       for (const it of items) {
-        it.y += v * dt + lift;
-        if (Math.abs(it.x - playerX) < 26 && Math.abs(it.y - (playerY - 8)) < 26) collect(it);
+        it.y += v * t + lift;
+        pull(it, dt);
+        if (near(it)) collect(it);
       }
       items = items.filter(it => !it.taken && it.y < VY1 + 40);
+      for (const it of powers) {
+        it.y += v * t + lift;
+        if (near(it)) takePower(it);
+      }
+      powers = powers.filter(it => !it.taken && it.y < VY1 + 40);
       for (const f of falling) {
-        f.y += (FALL + v) * dt + lift;
-        f.spin += dt * 4;
+        f.y += (FALL + v) * t + lift;
+        f.spin += t * 4;
         const dx = f.x - playerX, dy = f.y - (playerY - 4);
-        if (dx * dx + dy * dy < (HIT + 13) ** 2) { crash(); break; }
+        if (dx * dx + dy * dy < (HIT + 13) ** 2 && !survives()) { crash(); break; }
       }
       falling = falling.filter(f => f.y < VY1 + 60);
       while (Math.floor(climbed / WORLD_SPAN) > worldStep) { worldStep++; enterWorld(); }
@@ -572,15 +628,15 @@
     { id: 'haxa', name: 'Häxa', fur: '#7b3fb8', dark: '#2a1f3a', light: '#c8f0a8', leg: '#2a1f3a', fingers: false, skull: { rx: 12, ry: 12, color: '#c8f0a8', edge: '#7fb85a' }, behind: witchHair, face: witchFace, nape: witchNape, over: witchHat, body: witchDress },
     { id: 'sjojungfru', name: 'Sjöjungfru', fur: '#ffd9c2', dark: '#1a7f70', light: '#ffd9c2', fingers: false, legs: false, skull: { rx: 12, ry: 12, edge: '#e0a98c' }, face: mermaidFace, nape: mermaidNape, over: mermaidStar, body: mermaidBody, shell: mermaidHair },
     { id: 'snogubbe', name: 'Snögubbe', fur: '#6b4423', dark: '#6b4423', light: '#ffffff', armW: 2.6, twig: true, legs: false, skull: { rx: 12, ry: 11.5, color: '#ffffff', edge: '#b9c8dc' }, face: snowmanFace, over: snowmanHat, body: snowmanBody },
-    // åtta egna hjältar, med egna krafter
-    { id: 'natkastaren', name: 'Nätkastaren', fur: '#2bb673', dark: '#1d1d1d', light: '#2bb673', hand: '#1a7f50', fingers: false, face: webFace, nape: webNape, body: webBody },
-    { id: 'plathjalten', name: 'Plåthjälten', fur: '#c3ccd6', dark: '#2f6fd6', light: '#c3ccd6', edge: '#5f6b77', fingers: false, face: ironFace, nape: ironNape, body: ironBody },
-    { id: 'stenjatten', name: 'Stenjätten', fur: '#8a8f98', dark: '#5c6068', light: '#a4a9b2', armW: 8, skull: { rx: 15.5, ry: 13.5 }, face: stoneFace, nape: stoneNape, body: stoneBody },
-    { id: 'nattkatten', name: 'Nattkatten', fur: '#1d2450', dark: '#ffd23f', light: '#1d2450', foot: '#0f1430', behind: nightEars, face: nightFace, body: nightBody },
-    { id: 'askflickan', name: 'Åskflickan', fur: '#7b3fb8', dark: '#ffd23f', light: '#ffd6b8', hand: '#ffd23f', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: thunderFace, nape: thunderNape, body: thunderBody, shell: thunderCape },
-    { id: 'isblixten', name: 'Isblixten', fur: '#8fd3ff', dark: '#ffffff', light: '#ffd6b8', hand: '#ffffff', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: iceFace, nape: iceNape, over: iceHair, body: iceBody },
-    { id: 'vindhjalten', name: 'Vindhjälten', fur: '#2bb6a0', dark: '#1a7f70', light: '#ffd6b8', hand: '#ffffff', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: windFace, nape: windNape, over: windHair, body: windBody },
-    { id: 'eldhjalten', name: 'Eldhjälten', fur: '#e8503a', dark: '#ffd23f', light: '#ffd6b8', hand: '#ffd23f', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: fireFace, nape: fireNape, over: fireHair, body: fireBody },
+    // åtta egna hjältar, med egna krafter; de kostar 75 blå mynt var
+    { id: 'natkastaren', name: 'Nätkastaren', price: 75, fur: '#2bb673', dark: '#1d1d1d', light: '#2bb673', hand: '#1a7f50', fingers: false, face: webFace, nape: webNape, body: webBody },
+    { id: 'plathjalten', name: 'Plåthjälten', price: 75, fur: '#c3ccd6', dark: '#2f6fd6', light: '#c3ccd6', edge: '#5f6b77', fingers: false, face: ironFace, nape: ironNape, body: ironBody },
+    { id: 'stenjatten', name: 'Stenjätten', price: 75, fur: '#8a8f98', dark: '#5c6068', light: '#a4a9b2', armW: 8, skull: { rx: 15.5, ry: 13.5 }, face: stoneFace, nape: stoneNape, body: stoneBody },
+    { id: 'nattkatten', name: 'Nattkatten', price: 75, fur: '#1d2450', dark: '#ffd23f', light: '#1d2450', foot: '#0f1430', behind: nightEars, face: nightFace, body: nightBody },
+    { id: 'askflickan', name: 'Åskflickan', price: 75, fur: '#7b3fb8', dark: '#ffd23f', light: '#ffd6b8', hand: '#ffd23f', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: thunderFace, nape: thunderNape, body: thunderBody, shell: thunderCape },
+    { id: 'isblixten', name: 'Isblixten', price: 75, fur: '#8fd3ff', dark: '#ffffff', light: '#ffd6b8', hand: '#ffffff', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: iceFace, nape: iceNape, over: iceHair, body: iceBody },
+    { id: 'vindhjalten', name: 'Vindhjälten', price: 75, fur: '#2bb6a0', dark: '#1a7f70', light: '#ffd6b8', hand: '#ffffff', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: windFace, nape: windNape, over: windHair, body: windBody },
+    { id: 'eldhjalten', name: 'Eldhjälten', price: 75, fur: '#e8503a', dark: '#ffd23f', light: '#ffd6b8', hand: '#ffd23f', fingers: false, skull: { rx: 12.5, ry: 12.5, color: '#ffd6b8' }, face: fireFace, nape: fireNape, over: fireHair, body: fireBody },
     // en gåva till Wilhelm, som var först på Flappy Games topplista; syns bara för den som har den
     { id: 'guld', name: 'Guldperson', fur: '#ffd23f', dark: '#c98f00', light: '#fff1a8', edge: '#8a6200', gift: true, skull: { rx: 13, ry: 12.5 }, face: goldFace, nape: goldShine, over: goldCrown },
   ];
@@ -589,9 +645,11 @@
   // kostar 3, de fem nästa 5, och så vidare. Först kommer de två startfigurerna man
   // inte valde, sedan resten i samlingens ordning.
   const START_FIGURES = ['hund', 'apa', 'enhorning'];
-  const PRICES = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], PRICE_GROUP = 5;
-  const OTHER_FIGURES = FIGURES.filter(f => !f.gift).map(f => f.id).filter(id => !START_FIGURES.includes(id));
+  // En figur med eget pris, som hjältarna, kostar det.
+  const PRICES = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45], PRICE_GROUP = 5;
+  const OTHER_FIGURES = FIGURES.filter(f => !f.gift && !f.price).map(f => f.id).filter(id => !START_FIGURES.includes(id));
   function figurePrice(i) {
+    if (FIGURES[i].price) return FIGURES[i].price;
     const id = FIGURES[i].id;
     const place = START_FIGURES.includes(id) ? 0 : START_FIGURES.length - 1 + OTHER_FIGURES.indexOf(id);
     return PRICES[Math.floor(place / PRICE_GROUP)];
@@ -2332,6 +2390,63 @@
     agg: drawEgg, klubba: drawLolly, mutter: drawNut, ost: drawCheese,
   };
 
+  // ---------- Krafterna ----------
+
+  function drawPower(kind, x, y, scale = 1) {
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(scale, scale);
+    POWERS[kind].draw();
+    ctx.restore();
+  }
+
+  // Ikonerna ritas kring (0, 0), ungefär lika stora som sakerna.
+  function drawShieldIcon() {
+    poly([[0, -12], [10, -8], [9, 3], [0, 12], [-9, 3], [-10, -8]], C.blue, C.blueEdge);
+    poly([[0, -9], [7, -6], [6.5, 2], [0, 8]], 'rgba(255,255,255,0.3)');
+    star(0, -1, 5, C.white);
+  }
+
+  function drawMagnetIcon() {
+    const horseshoe = () => {
+      ctx.beginPath(); ctx.moveTo(-7, -8); ctx.lineTo(-7, 1);
+      ctx.arc(0, 1, 7, Math.PI, 0, true); ctx.lineTo(7, -8); ctx.stroke();
+    };
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 9.5; horseshoe();
+    ctx.strokeStyle = '#e63946'; ctx.lineWidth = 6.5; horseshoe();
+    for (const x of [-10.25, 3.75]) {
+      ctx.fillStyle = '#e8edf2'; ctx.fillRect(x, -12, 6.5, 5);
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x, -12, 6.5, 5);
+    }
+  }
+
+  function drawSnailIcon() {
+    rr(-12, 4, 24, 6, 3); ctx.fillStyle = '#b5e06a'; ctx.fill();
+    ctx.strokeStyle = '#5b8a2a'; ctx.lineWidth = 1.5; ctx.stroke();
+    seg(-9, 5, -12, -4); seg(-7, 5, -7, -5);
+    blob(-12, -4, 1.6, C.ink); blob(-7, -5, 1.6, C.ink);
+    ovalEdge(3, -1, 8, 8, '#ff9f1c', '#b86a00');
+    ctx.strokeStyle = '#b86a00'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(3, -1, 4.5, 0, Math.PI * 1.5); ctx.stroke();
+    blob(3, -1, 1.5, '#b86a00');
+  }
+
+  // Krafterna som verkar just nu, uppe till höger, med hur lång tid som är kvar.
+  function drawActivePowers() {
+    let x = VX1 - 14 - 34;
+    const y = UI_T + 14;
+    POWERS.forEach((pw, i) => {
+      const left = pw.left();
+      if (left <= 0) return;
+      rr(x, y, 34, 34, 10);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.stroke();
+      drawPower(i, x + 17, y + 17, 0.85);
+      if (pw.secs) { rr(x + 3, y + 38, 28 * left, 5, 2.5); ctx.fillStyle = C.banana; ctx.fill(); }
+      x -= 40;
+    });
+  }
+
   // ---------- Sakerna ----------
 
   function seg(x1, y1, x2, y2) {
@@ -2824,6 +2939,7 @@
     }
     ctx.globalAlpha = 1;
     drawBoxRow(box, 30, UI_B - 24, { empty: 'Samla saker i lådan!' });
+    drawActivePowers();
     ctx.globalAlpha = 1;
     const tip = time - startedAt;
     if (state === 'playing' && tip < 3) {
@@ -2856,13 +2972,33 @@
         blob(it.x, y, 17, 'rgba(255,255,255,0.35)');
         drawItem(it.kind, it.x, y);
       }
+      // krafterna i en bubbla som pulserar, så att de syns från sakerna
+      for (const it of powers) {
+        const y = it.y + Math.sin(time * 3 + it.phase) * 3, r = 19 + Math.sin(time * 6 + it.phase) * 1.5;
+        blob(it.x, y, r, 'rgba(255,255,255,0.55)');
+        ctx.strokeStyle = C.white; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(it.x, y, r, 0, Math.PI * 2); ctx.stroke();
+        drawPower(it.kind, it.x, y);
+      }
       // en skugga lyfter det som faller ut från väggen
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 5;
       for (const f of falling) (DROPS[f.kind] ?? drawPot)(f.x, f.y, f.spin);
       ctx.restore();
-      // uppe på väggen syns den bakifrån; när den faller vänder den sig om
-      drawClimber(playerX, playerY, { dead: state !== 'playing', back: state === 'playing' });
+      // uppe på väggen syns den bakifrån; när den faller vänder den sig om. Den blinkar
+      // medan skölden just har tagit en träff.
+      const playing = state === 'playing';
+      if (playing && time < safeUntil && Math.floor(time * 12) % 2 === 0) ctx.globalAlpha = 0.35;
+      drawClimber(playerX, playerY, { dead: !playing, back: playing });
+      ctx.globalAlpha = 1;
+      if (playing && shield) {
+        blob(playerX, playerY - 4, 36, 'rgba(120,200,255,0.22)');
+        ctx.strokeStyle = 'rgba(160,220,255,0.8)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(playerX, playerY - 4, 36, 0, Math.PI * 2); ctx.stroke();
+      }
+      // slow motion färgar världen lite blå
+      if (playing && time < slowUntil) { ctx.fillStyle = 'rgba(120,170,255,0.14)'; ctx.fillRect(VX0, VY0, VW, VH); }
+      if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash * 0.7})`; ctx.fillRect(VX0, VY0, VW, VH); }
     }
     drawHud();
     if (state === 'over') drawOver();

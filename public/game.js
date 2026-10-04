@@ -121,15 +121,15 @@
     { id: 'haxa', name: 'Häxa', world: 'Spöknatt', flight: 'Häxan flyger på sin kvast', draw: drawWitch },
     { id: 'sjojungfru', name: 'Sjöjungfru', world: 'Havet', flight: 'Sjöjungfrun simmar genom luften', draw: drawMermaid },
     { id: 'snogubbe', name: 'Snögubbe', world: 'Vinter', flight: 'Snögubben flaxar med pinnarmarna', draw: drawSnowman },
-    // åtta egna hjältar, med egna krafter
-    { id: 'natkastaren', name: 'Nätkastaren', world: 'Storstad', flight: 'Nätkastaren svingar sig fram i sina nät', draw: drawNatkastaren },
-    { id: 'plathjalten', name: 'Plåthjälten', world: 'Verkstad', flight: 'Plåthjälten flyger med raketstövlar', draw: drawPlathjalten },
-    { id: 'stenjatten', name: 'Stenjätten', world: 'Berg', flight: 'Stenjätten tar jättehopp', draw: drawStenjatten },
-    { id: 'nattkatten', name: 'Nattkatten', world: 'Natt', flight: 'Nattkatten smyger genom luften', draw: drawNattkatten },
-    { id: 'askflickan', name: 'Åskflickan', world: 'Åskmoln', flight: 'Åskflickan flyger med blixtar', draw: drawAskflickan },
-    { id: 'isblixten', name: 'Isblixten', world: 'Glaciär', flight: 'Isblixten glider på is', draw: drawIsblixten },
-    { id: 'vindhjalten', name: 'Vindhjälten', world: 'Himmel', flight: 'Vindhjälten bärs av vinden', draw: drawVindhjalten },
-    { id: 'eldhjalten', name: 'Eldhjälten', world: 'Vulkan', flight: 'Eldhjälten flyger på eld', draw: drawEldhjalten },
+    // åtta egna hjältar, med egna krafter; de kostar 75 blå mynt var
+    { id: 'natkastaren', name: 'Nätkastaren', world: 'Storstad', flight: 'Nätkastaren svingar sig fram i sina nät', draw: drawNatkastaren, price: 75 },
+    { id: 'plathjalten', name: 'Plåthjälten', world: 'Verkstad', flight: 'Plåthjälten flyger med raketstövlar', draw: drawPlathjalten, price: 75 },
+    { id: 'stenjatten', name: 'Stenjätten', world: 'Berg', flight: 'Stenjätten tar jättehopp', draw: drawStenjatten, price: 75 },
+    { id: 'nattkatten', name: 'Nattkatten', world: 'Natt', flight: 'Nattkatten smyger genom luften', draw: drawNattkatten, price: 75 },
+    { id: 'askflickan', name: 'Åskflickan', world: 'Åskmoln', flight: 'Åskflickan flyger med blixtar', draw: drawAskflickan, price: 75 },
+    { id: 'isblixten', name: 'Isblixten', world: 'Glaciär', flight: 'Isblixten glider på is', draw: drawIsblixten, price: 75 },
+    { id: 'vindhjalten', name: 'Vindhjälten', world: 'Himmel', flight: 'Vindhjälten bärs av vinden', draw: drawVindhjalten, price: 75 },
+    { id: 'eldhjalten', name: 'Eldhjälten', world: 'Vulkan', flight: 'Eldhjälten flyger på eld', draw: drawEldhjalten, price: 75 },
     // en gåva till Wilhelm, som var först på topplistan
     { id: 'guld', name: 'Guldperson', world: 'Guldland', flight: 'Guldpersonen flyger på gyllene vingar', draw: drawGold, gift: 'wilhelm' },
   ];
@@ -550,9 +550,11 @@
   // Priset i blå mynt för varje grupp om fem figurer att köpa: de fem första kostar 3,
   // de fem nästa 5, och så vidare. Först kommer de två andra startfigurerna, sedan
   // resten i samlingens ordning, så priset är detsamma vilken man än valde först.
-  const PRICES = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], PRICE_GROUP = 5;
-  const OTHER_FIGURES = CHARACTERS.filter(c => !c.gift).map(c => c.id).filter(id => !START_FIGURES.includes(id));
+  // En figur med eget pris, som hjältarna, kostar det.
+  const PRICES = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45], PRICE_GROUP = 5;
+  const OTHER_FIGURES = CHARACTERS.filter(c => !c.gift && !c.price).map(c => c.id).filter(id => !START_FIGURES.includes(id));
   function figurePrice(ci) {
+    if (CHARACTERS[ci].price) return CHARACTERS[ci].price;
     const id = CHARACTERS[ci].id;
     const place = START_FIGURES.includes(id) ? 0 : START_FIGURES.length - 1 + OTHER_FIGURES.indexOf(id);
     return PRICES[Math.floor(place / PRICE_GROUP)];

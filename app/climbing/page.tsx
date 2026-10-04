@@ -21,6 +21,7 @@ const DESCRIPTION = [
   'Figuren klättrar uppför en tegelvägg av sig själv.',
   'Håll på vänster eller höger halva av skärmen, eller håll inne pil- eller A- och D-tangenterna, för att flytta dig åt sidan.',
   'Samla mynt, bananer, paket, stjärnor och diamanter på väggen; de lyfter dig fler meter. Blå mynt köper figurer i Flappy Game.',
+  'Ibland sitter en kraft på väggen i stället: en sköld som tar en träff, en magnet som drar sakerna till dig och slow motion som saktar ner det som faller.',
   'Väj för blomkrukor och tegelstenar som faller; träffas figuren faller den ner.',
   'Poängen är hur många meter du har klättrat. När du har fallit visas höjden och ditt rekord, och ett tryck tar dig tillbaka till startskärmen.',
   'Var 40:e meter klättrar du in i en ny av 43 världar, med en egen vägg och egna saker som faller, och varje ny värld ger 2 blå mynt.',
