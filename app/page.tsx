@@ -2,13 +2,21 @@ import styles from './page.module.css';
 
 // Första sidan: spelen att välja mellan. Varje spel är en egen sida. Länken laddar
 // spelets sida på nytt, så att ett spel börjar från början varje gång och slutar
-// spela musik när man går därifrån.
-const GAMES = [
+// spela musik när man går därifrån. Ett spel som inte är byggt än (`soon`) har bara
+// sin startskärm, och kortet säger att det kommer snart.
+const GAMES: { href: string; name: string; text: string; image: string; soon?: boolean }[] = [
   {
     href: '/flappy',
     name: 'Flappy Game',
     text: 'Flyg genom tio världar, samla blå mynt och köp nya figurer.',
     image: '/spel/flappy-game.png',
+  },
+  {
+    href: '/climbing',
+    name: 'Climbing Game',
+    text: 'Klättra uppför tegelväggen, grepp för grepp.',
+    image: '/spel/climbing-game.png',
+    soon: true,
   },
 ];
 
@@ -23,7 +31,7 @@ export default function Home() {
               <img className={styles.image} src={game.image} alt="" width={512} height={512} />
               <span className={styles.name}>{game.name}</span>
               <span className={styles.text}>{game.text}</span>
-              <span className={styles.play}>Spela</span>
+              <span className={game.soon ? `${styles.play} ${styles.soon}` : styles.play}>{game.soon ? 'Kommer snart' : 'Spela'}</span>
             </a>
           </li>
         ))}
