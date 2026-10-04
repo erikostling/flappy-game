@@ -564,16 +564,16 @@
 
   // ---------- Racet i Car Game ----------
 
-  // Banan är en sluten slinga, räknad från en jämn kurva och utsträckt så att ett varv
-  // är LAP pixlar. CIRCUIT har en punkt var STEP:e pixel längs banans mitt, med
-  // riktningen där; vägen framför bilen ritas utifrån dem, och kartan visar hela slingan.
+  // Banan är en sluten slinga, och varje värld har sin egen form: `shape` i CAR_WORLDS
+  // ger en punkt för t från 0 till 2π, och slingan dras ut så att ett varv alltid är LAP
+  // pixlar. En bana har en punkt var STEP:e pixel längs banans mitt, med riktningen där;
+  // vägen framför bilen ritas utifrån dem, och kartan visar hela slingan. Starten ligger
+  // där banan är rakast 600 px åt båda hållen, om världen inte säger var (`start`).
   const LAP = 24000, STEP = 20, ROADW = 230, ROAD_SPEED = 440, GRASS_SPEED = 160;
-  const CIRCUIT = (() => {
+  const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
+  function buildCircuit({ shape, start }) {
     const raw = [];
-    for (let i = 0; i <= 2400; i++) {
-      const t = i / 2400 * Math.PI * 2;
-      raw.push([Math.cos(t) + 0.28 * Math.cos(2 * t) - 0.12 * Math.sin(3 * t), 0.62 * Math.sin(t) + 0.18 * Math.sin(2 * t)]);
-    }
+    for (let i = 0; i <= 2400; i++) raw.push(shape(i / 2400 * Math.PI * 2));
     let total = 0;
     const acc = [0];
     for (let i = 1; i < raw.length; i++) { total += Math.hypot(raw[i][0] - raw[i - 1][0], raw[i][1] - raw[i - 1][1]); acc.push(total); }
@@ -586,13 +586,23 @@
       pts.push({ x: (raw[j][0] + (raw[j + 1][0] - raw[j][0]) * f) * k, y: (raw[j][1] + (raw[j + 1][1] - raw[j][1]) * f) * k });
     }
     for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; a.dir = Math.atan2(b.y - a.y, b.x - a.x); }
-    return pts;
-  })();
-  const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
+    if (start === 0) return pts;
+    const bend = i => Math.abs(wrapAngle(pts[(i + 2) % n].dir - pts[(i - 2 + n) % n].dir));
+    let first = 0, least = Infinity;
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      for (let d = -30; d <= 30; d++) sum += bend((i + d + n) % n);
+      if (sum < least) { least = sum; first = i; }
+    }
+    return pts.slice(first).concat(pts.slice(0, first));
+  }
+  // banan i världen som visas, räknad första gången den behövs
+  const circuits = [];
+  const circuit = () => { const w = shownCarIndex(); return (circuits[w] ??= buildCircuit(CAR_WORLDS[w])); };
   // en punkt på banans mitt `s` pixlar från start, med riktningen där
   function trackAt(s) {
-    const n = CIRCUIT.length, f = ((s / STEP) % n + n) % n, i = Math.floor(f), u = f - i;
-    const a = CIRCUIT[i], b = CIRCUIT[(i + 1) % n];
+    const pts = circuit(), n = pts.length, f = ((s / STEP) % n + n) % n, i = Math.floor(f), u = f - i;
+    const a = pts[i], b = pts[(i + 1) % n];
     return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, dir: a.dir + wrapAngle(b.dir - a.dir) * u };
   }
   // en punkt `lat` pixlar till höger om banans mitt (till vänster om den är negativ)
@@ -2785,10 +2795,20 @@
     ctx.restore();
   }
 
-  // Car Games världar. Banan är densamma, men marken, vägen, kantstenarna, mittlinjen
-  // och det som står bredvid banan är olika; vinner man ett race kommer man till nästa.
-  // `deco` är två saker bredvid banan, sedda uppifrån, och `h` gör att två intill
-  // varandra inte blir likadana.
+  // Car Games världar, var och en med sin form på banan (`shape`, se buildCircuit), sin
+  // mark, väg, kantstenar och mittlinje och sina saker bredvid banan; vinner man ett race
+  // kommer man till nästa. `deco` är två saker bredvid banan, sedda uppifrån, och `h`
+  // gör att två intill varandra inte blir likadana.
+  //
+  // De flesta banorna går runt en mittpunkt: radien är 1 plus vågorna [k, a, fas], k
+  // gånger runt, och sx och sy drar ut den på bredden och höjden. Med p större än 2 blir
+  // grundformen en rundad fyrkant i stället för en cirkel. Ingen kurva är skarpare än i
+  // Gröna dalen.
+  const polar = (sx, sy, waves, p = 2) => t => {
+    let r = (Math.abs(Math.cos(t)) ** p + Math.abs(Math.sin(t)) ** p) ** (-1 / p);
+    for (const [k, a, phase] of waves) r += a * Math.cos(k * t + phase);
+    return [sx * r * Math.cos(t), sy * r * Math.sin(t)];
+  };
   const tree = (dark, light) => (x, y) => { blob(x, y, 15, dark); blob(x - 4, y - 4, 9, light); };
   const bush = color => (x, y) => oval(x, y, 13, 8, color);
   function glow(x, y, r, color) {
@@ -2872,21 +2892,52 @@
     blob(x - 12 + (h >> 4) % 24, y - 12, 1.2, C.white);
   }
   const CAR_WORLDS = [
-    { name: 'Gröna dalen', ground: '#5cb83a', road: '#5a5f66', kerb: '#e63946', line: '#f4f1e0', deco: [tree('#3f8a34', '#5cb83a'), bush('#47992a')] },
-    { name: 'Öknen', ground: '#e9c46a', road: '#7d6b57', kerb: '#e76f51', line: '#fff3d6', deco: [cactus, rock('#a08a6a', '#bba584')] },
-    { name: 'Vinterlandet', ground: '#eaf4fb', road: '#6b7785', kerb: '#2f80ed', line: C.white, deco: [fir, snowman] },
-    { name: 'Stranden', ground: '#f6dfa4', road: '#5a5f66', kerb: '#ff9f1c', line: '#f4f1e0', deco: [palm, parasol] },
-    { name: 'Höstskogen', ground: '#b9893f', road: '#5a5f66', kerb: '#e63946', line: '#f4f1e0', deco: [tree('#c0392b', '#e05a47'), tree('#d35400', '#f39c12')] },
-    { name: 'Godislandet', ground: '#ffc2e2', road: '#7b4a2e', kerb: '#ff5e7a', line: '#ffe3f1', deco: [lollipop, candy] },
-    { name: 'Natten', ground: '#1d2b4a', road: '#2f333b', kerb: '#ffd23f', line: '#ffd23f', deco: [lamp, tree('#163a2c', '#1f5240')] },
-    { name: 'Vulkanen', ground: '#3a2a2a', road: '#4a4a50', kerb: '#ff6a1a', line: '#ffb347', deco: [lava, rock('#241818', '#3a2a2a')] },
-    { name: 'Djungeln', ground: '#2f7d32', road: '#5a5f66', kerb: '#ffd23f', line: '#f4f1e0', deco: [fern, flower] },
-    { name: 'Rymden', ground: '#1a1033', road: '#3d3f55', kerb: '#9b6dff', kerb2: '#4cc9f0', line: '#4cc9f0', deco: [planet, sparkle] },
+    {
+      name: 'Gröna dalen', shape: t => [Math.cos(t) + 0.28 * Math.cos(2 * t) - 0.12 * Math.sin(3 * t), 0.62 * Math.sin(t) + 0.18 * Math.sin(2 * t)], start: 0,
+      ground: '#5cb83a', road: '#5a5f66', kerb: '#e63946', line: '#f4f1e0', deco: [tree('#3f8a34', '#5cb83a'), bush('#47992a')],
+    },
+    {
+      name: 'Öknen', shape: polar(1.5, 0.55, [[2, 0.12, 0], [3, 0.16, 0.6]]),
+      ground: '#e9c46a', road: '#7d6b57', kerb: '#e76f51', line: '#fff3d6', deco: [cactus, rock('#a08a6a', '#bba584')],
+    },
+    {
+      name: 'Vinterlandet', shape: polar(1, 0.95, [[3, 0.3, 0]]),
+      ground: '#eaf4fb', road: '#6b7785', kerb: '#2f80ed', line: C.white, deco: [fir, snowman],
+    },
+    {
+      name: 'Stranden', shape: polar(1.3, 0.8, [[1, 0.2, 0], [2, 0.32, 1.9]]),
+      ground: '#f6dfa4', road: '#5a5f66', kerb: '#ff9f1c', line: '#f4f1e0', deco: [palm, parasol],
+    },
+    {
+      name: 'Höstskogen', shape: polar(1, 1, [[4, 0.26, 0.4]]),
+      ground: '#b9893f', road: '#5a5f66', kerb: '#e63946', line: '#f4f1e0', deco: [tree('#c0392b', '#e05a47'), tree('#d35400', '#f39c12')],
+    },
+    {
+      name: 'Godislandet', shape: polar(1.05, 0.95, [[5, 0.17, 0], [2, 0.12, 1]]),
+      ground: '#ffc2e2', road: '#7b4a2e', kerb: '#ff5e7a', line: '#ffe3f1', deco: [lollipop, candy],
+    },
+    {
+      name: 'Natten', shape: polar(1.3, 0.8, [[8, 0.035, 0]], 5),
+      ground: '#1d2b4a', road: '#2f333b', kerb: '#ffd23f', line: '#ffd23f', deco: [lamp, tree('#163a2c', '#1f5240')],
+    },
+    {
+      name: 'Vulkanen', shape: polar(1.35, 0.85, [[2, 0.42, 0], [3, 0.12, 2]]),
+      ground: '#3a2a2a', road: '#4a4a50', kerb: '#ff6a1a', line: '#ffb347', deco: [lava, rock('#241818', '#3a2a2a')],
+    },
+    {
+      name: 'Djungeln', shape: polar(1.1, 0.9, [[3, 0.2, 0], [5, 0.08, 1.2], [7, 0.03, 2.5]]),
+      ground: '#2f7d32', road: '#5a5f66', kerb: '#ffd23f', line: '#f4f1e0', deco: [fern, flower],
+    },
+    {
+      name: 'Rymden', shape: polar(1, 1, [[6, 0.085, 0], [2, 0.25, 0.7], [1, 0.12, 2]]),
+      ground: '#1a1033', road: '#3d3f55', kerb: '#9b6dff', kerb2: '#4cc9f0', line: '#4cc9f0', deco: [planet, sparkle],
+    },
   ];
   // den värld man har kommit till, och den som visas: på startskärmen den man har kommit
   // till, annars den man kör i
   const carWorldIndex = () => Math.min(bestWorld, CAR_WORLDS.length - 1);
-  const shownCarWorld = () => CAR_WORLDS[state === 'ready' ? carWorldIndex() : raceWorld];
+  const shownCarIndex = () => (state === 'ready' ? carWorldIndex() : raceWorld);
+  const shownCarWorld = () => CAR_WORLDS[shownCarIndex()];
 
   // Car Games bana, sedd från bilen: marken med världens saker bredvid, banan med
   // kantstenar och streckad mittlinje, och mållinjen vid varje helt varv.
@@ -2959,14 +3010,15 @@
     const b = { x: VX1 - 14 - 110, y: UI_T + 14, w: 110, h: 80 };
     rr(b.x, b.y, b.w, b.h, 12); ctx.fillStyle = 'rgba(255,247,224,0.9)'; ctx.fill();
     ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.stroke();
+    const pts = circuit();
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    for (const p of CIRCUIT) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+    for (const p of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
     const k = Math.min((b.w - 20) / (x1 - x0), (b.h - 20) / (y1 - y0));
     const map = p => [b.x + b.w / 2 + (p.x - (x0 + x1) / 2) * k, b.y + b.h / 2 + (p.y - (y0 + y1) / 2) * k];
     ctx.beginPath();
-    CIRCUIT.forEach((p, i) => { const [x, y] = map(p); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+    pts.forEach((p, i) => { const [x, y] = map(p); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
     ctx.closePath(); ctx.strokeStyle = '#5a5f66'; ctx.lineWidth = 5; ctx.lineJoin = 'round'; ctx.stroke();
-    const [sx, sy] = map(CIRCUIT[0]);
+    const [sx, sy] = map(pts[0]);
     ctx.fillStyle = C.ink; ctx.fillRect(sx - 1.5, sy - 5, 3, 10);
     for (const r of rivals) { const [rx, ry] = map(trackAt(r.s)); blob(rx, ry, 3.2, r.color); }
     const [px, py] = map(trackAt(climbed));

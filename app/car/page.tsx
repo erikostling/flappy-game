@@ -16,7 +16,7 @@ const DESCRIPTION = [
   'Dra fingret åt sidan så följer bilen med, eller styr med pil- eller A- och D-tangenterna.',
   'Håll dig på banan: på gräset går det långsammare, och i kurvorna drar bilen utåt. Kartan uppe till höger visar var på banan du är.',
   'Poängen är tiden för varvet; ju snabbare desto bättre. Blå mynt på banan köper figurer.',
-  'Kommer du först kommer du till nästa värld, med en ny miljö runt banan och lite snabbare motståndare. Det finns tio världar, och startskärmen visar vilken du är i uppe till höger.',
+  'Kommer du först kommer du till nästa värld, med en ny form på banan, en ny miljö runt den och lite snabbare motståndare. Det finns tio världar, och startskärmen visar vilken du är i uppe till höger.',
   'Knapparna längst ner på startskärmen öppnar Figurer, Inställningar och Topplista.',
 ].join(' ');
 
