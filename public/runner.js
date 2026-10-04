@@ -307,6 +307,8 @@
   let air = 0, airTime = 1, lastS = 0;
   // en fartplatta: när den extra farten slutar
   let boostUntil = 0;
+  // färgen startljuset senast pep för (lightPhase), −1 innan det har tänts
+  let shownLight = -1;
   // de fyra motståndarna, när man senast krockade med en, och vilken plats man kom på
   let rivals = [], lastBump = -10, place = 0;
   // sakerna på väggen, vad som har hamnat i lådan den här rundan, och metrarna som
@@ -391,7 +393,7 @@
     state = 'playing'; climbed = 0; nextSpawnAt = CAR ? 300 : 200; nextMilestone = TRACK.milestone;
     playerX = W / 2; playerY = PLAYER_Y; fallVy = 0; fallSpin = 0; spinV = 0;
     obstacles = []; popups = []; newBest = false; placed = 0; startedAt = time;
-    carSpeed = 0; lapTime = 0; steerTilt = 0; lastX = W / 2; place = 0; unlocked = false; air = 0; boostUntil = 0;
+    carSpeed = 0; lapTime = 0; steerTilt = 0; lastX = W / 2; place = 0; unlocked = false; air = 0; boostUntil = 0; shownLight = -1;
     raceWorld = carWorldIndex();
     raceItems = CAR ? placeRaceItems() : [];
     rivals = CAR ? placeRivals() : [];
@@ -719,8 +721,8 @@
   // Fyra motståndare som kör samma varv, var och en med sin färg, sin förare och sin
   // fart, som blir RIVAL_GAIN snabbare för varje värld. De står framför en på
   // startplattan, så att man måste köra om dem; de saktar in i kurvorna och byter fil
-  // ibland. Man börjar START_BEHIND bakom startlinjen, och
-  // nedräkningen tar COUNTDOWN sekunder.
+  // ibland. Man börjar START_BEHIND bakom startlinjen, och startljuset lyser rött och
+  // gult i COUNTDOWN sekunder innan det blir grönt och racet börjar.
   const RIVALS = [
     { color: '#2f80ed', dark: '#1a4f99', top: 418 },
     { color: '#2bb673', dark: '#1a7f50', top: 406 },
@@ -784,7 +786,13 @@
   // hur högt en bil är i ett hopp, från 0 på marken till 1 högst upp
   const lift = (left, total) => (left > 0 ? Math.sin(Math.PI * (1 - left / total)) : 0);
   function stepRace(t) {
-    // under nedräkningen står alla stilla
+    // startljuset piper när det byter färg, högre för grönt
+    const light = lightPhase(startedAt - time);
+    if (light !== shownLight) {
+      shownLight = light;
+      if (light === 2) play('chime', 0.6, 1.4); else play('select', 0.6, 0.9 + light * 0.2);
+    }
+    // innan det är grönt står alla stilla
     if (time < startedAt) { carSpeed = 0; lastS = climbed; return null; }
     stepRivals(t);
     if (!air && overPad(lastS, climbed, playerX - W / 2)) {
@@ -821,7 +829,7 @@
     return null;
   }
 
-  // tiden på klockan: hur länge man har kört, och noll under nedräkningen
+  // tiden på klockan: hur länge man har kört, och noll innan startljuset är grönt
   const lapClock = () => Math.max(0, raceTime());
 
   function collectRaceItem(it) {
@@ -3223,6 +3231,25 @@
     say('km/h', x, y + 29, 9, { font: BODY, weight: '800', fill: C.dirt, outline: null });
   }
 
+  // Startljuset: tre lampor i rad, där den röda lyser först, sedan den gula och den
+  // gröna när racet börjar (`left` är tiden kvar till dess). Den gröna lyser en stund
+  // och sedan tonar ljuset bort.
+  const LIGHTS = [['#e63946', '#4a1d22'], ['#ffd23f', '#4a4018'], ['#2bdc6a', '#163d25']];
+  const lightPhase = left => (left > COUNTDOWN / 2 ? 0 : left > 0 ? 1 : 2);
+  function drawStartLight(left) {
+    const on = lightPhase(left), w = 168, h = 64, x = W / 2 - w / 2, y = 218;
+    ctx.globalAlpha = Math.max(0, Math.min(1, (left + 1.2) / 0.4));
+    rr(x, y, w, h, 18); ctx.fillStyle = '#1d1d1d'; ctx.fill();
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 3; ctx.stroke();
+    LIGHTS.forEach(([lit, dark], i) => {
+      const cx = x + 32 + i * 52, cy = y + h / 2;
+      if (i === on) glow(cx, cy, 46, lit + '99');
+      blob(cx, cy, 21, i === on ? lit : dark);
+      if (i === on) blob(cx - 6, cy - 6, 6, 'rgba(255,255,255,0.55)');
+    });
+    ctx.globalAlpha = 1;
+  }
+
   // Pedalen och spaken för den som kör med fingret. Pedalen är en räfflad platta som
   // trycks ner och lyser medan man håller den; spaken en rund platta med en knopp som
   // följer fingret åt sidan.
@@ -3694,8 +3721,8 @@
       drawSpeedometer();
       say(`Plats ${racePlace()} av ${rivals.length + 1}`, W / 2, UI_T + (best ? 100 : 80), 15, { font: BODY, weight: '800', fill: C.banana });
       const left = startedAt - time;
-      if (left > -0.6) {
-        say(left > 0 ? String(Math.ceil(left / (COUNTDOWN / 3))) : 'Kör!', W / 2, 250, 72, { fill: C.banana });
+      if (left > -1.2) {
+        drawStartLight(left);
         if (left > 0) say(`Värld ${raceWorld + 1}: ${CAR_WORLDS[raceWorld].name}`, W / 2, 185, 20);
       }
       // står bilen still när tipset har tonat bort påminns man om hur man kör
@@ -3738,9 +3765,9 @@
     const tip = time - startedAt;
     if (state === 'playing' && tip < 3) {
       ctx.globalAlpha = Math.min(1, 3 - tip);
-      // i Car Game mitt på skärmen, under nedräkningen, där lådan inte är i vägen
+      // i Car Game mitt på skärmen, under startljuset, där lådan inte är i vägen
       const text = CAR && touchUI ? 'Håll in gasen till vänster för att köra\noch styr med spaken till höger' : TRACK.tip;
-      text.split('\n').forEach((line, i) => say(line, W / 2, (CAR ? 300 : PLAYER_Y + 100) + i * 18, 14, { font: BODY, weight: '800' }));
+      text.split('\n').forEach((line, i) => say(line, W / 2, (CAR ? 312 : PLAYER_Y + 100) + i * 18, 14, { font: BODY, weight: '800' }));
       ctx.globalAlpha = 1;
     }
   }
