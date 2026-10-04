@@ -196,7 +196,7 @@
     { id: 'diamant', name: 'Diamant', value: 10, weight: 4, draw: drawDiamond },
     { id: 'blamynt', name: 'Blått mynt', value: 0, weight: 10, draw: drawBlueCoin, currency: true },
   ];
-  const ITEM_CHANCE = 0.7;
+  const ITEM_CHANCE = 0.7, BLUE = ITEMS.findIndex(it => it.currency);
   function pickItem() {
     let r = Math.random() * 100;
     for (let i = 0; i < ITEMS.length; i++) { r -= ITEMS[i].weight; if (r < 0) return i; }
@@ -215,6 +215,8 @@
   // sakerna på väggen, vad som har hamnat i lådan den här rundan, och meter som en
   // sak har gett men som figuren inte har klättrat än
   let items = [], box = ITEMS.map(() => 0), nextItemAt = 0, boost = 0;
+  // världen figuren har klättrat in i den här rundan, och när den kom dit
+  let worldStep = 0, worldShownAt = -10;
   // 'figures', 'settings' och 'scores' är rutorna på startskärmen; 'entry' är namnrutan
   let overlay = null;
   let best = Math.max(0, Math.floor(Number(load('climbing-best')) || 0)), newBest = false;
@@ -232,6 +234,7 @@
     playerX = W / 2; playerY = PLAYER_Y; fallVy = 0; fallSpin = 0;
     falling = []; popups = []; newBest = false; placed = 0; startedAt = time;
     items = []; box = ITEMS.map(() => 0); nextItemAt = 120; boost = 0;
+    worldStep = 0; worldShownAt = -10;
     holds.clear();
   }
 
@@ -263,6 +266,13 @@
     if (qualifies(meters())) openEntry();
   }
 
+  function enterWorld() {
+    worldShownAt = time;
+    store('flappy-apa-blamynt', blueCoins() + WORLD_BONUS);
+    box[BLUE] += WORLD_BONUS;
+    play('chime', 0.7);
+  }
+
   function spawnItem() {
     items.push({ kind: pickItem(), x: randomX(), y: VY0 - 30, phase: Math.random() * 6 });
   }
@@ -284,14 +294,15 @@
   }
 
   function spawn() {
-    const kind = Math.random() < 0.6 ? 'kruka' : 'tegel';
+    const [first, second] = worldAt(climbed + PLAYER_Y - VY0).drops;
+    const kind = Math.random() < 0.6 ? first : second;
     const x = randomX();
     falling.push({ kind, x, y: VY0 - 40, spin: Math.random() * 6 });
     // ibland faller två saker samtidigt, en bra bit ifrån varandra
     if (climbed > 1200 && Math.random() < 0.3) {
       let other = randomX();
       while (Math.abs(other - x) < 110) other = randomX();
-      falling.push({ kind: kind === 'kruka' ? 'tegel' : 'kruka', x: other, y: VY0 - 90, spin: Math.random() * 6 });
+      falling.push({ kind: kind === first ? second : first, x: other, y: VY0 - 90, spin: Math.random() * 6 });
     }
   }
 
@@ -321,9 +332,10 @@
         if (dx * dx + dy * dy < (HIT + 13) ** 2) { crash(); break; }
       }
       falling = falling.filter(f => f.y < VY1 + 60);
+      while (Math.floor(climbed / WORLD_SPAN) > worldStep) { worldStep++; enterWorld(); }
+      // var tionde meter, utom där en ny värld säger det själv
       if (meters() >= nextMilestone) {
-        popups.push({ text: `${nextMilestone} m!`, at: time });
-        play('score', 0.5);
+        if (nextMilestone % WORLD_METERS) { popups.push({ text: `${nextMilestone} m!`, at: time }); play('score', 0.5); }
         nextMilestone += 10;
       }
     } else if (state === 'falling') {
@@ -440,26 +452,6 @@
   const hash = i => (Math.imul(i, 2654435761) >>> 0) % 1000;
 
   // ---------- Världen ----------
-
-  // Teglet rullar nedåt medan apan klättrar; varannan rad är förskjuten.
-  function drawWall() {
-    const bw = 48, bh = 20, offset = climbed % (bh * 2);
-    ctx.fillStyle = C.mortar; ctx.fillRect(VX0, VY0, VW, VH);
-    const firstRow = Math.floor((VY0 - offset) / bh) - 1, rowBase = Math.floor(climbed / bh);
-    for (let r = firstRow; r * bh + offset < VY1 + bh; r++) {
-      const y = r * bh + offset, worldRow = r - rowBase;
-      const shift = ((worldRow % 2) + 2) % 2 ? bw / 2 : 0;
-      for (let x = Math.floor((VX0 - shift) / bw) * bw + shift - bw; x < VX1 + bw; x += bw) {
-        rr(x + 1.5, y + 1.5, bw - 3, bh - 3, 2.5);
-        ctx.fillStyle = C.bricks[hash(worldRow * 31 + Math.round(x / bw) * 7 + 1000) % C.bricks.length]; ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(x + 3, y + 3, bw - 6, 2.5);
-      }
-    }
-    // mörkare mot kanterna, så att spåren i mitten syns
-    const g = ctx.createRadialGradient(W / 2, H / 2, 120, W / 2, H / 2, Math.max(VW, VH) * 0.7);
-    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.35)');
-    ctx.fillStyle = g; ctx.fillRect(VX0, VY0, VW, VH);
-  }
 
   // ---------- Figurerna ----------
 
@@ -1703,6 +1695,418 @@
     ctx.restore();
   }
 
+  // ---------- Världarna ----------
+
+  // Var 20:e meter klättrar man in i en ny värld, med en egen vägg och egna saker som
+  // faller; efter den sista börjar det om. Varje ny värld ger 2 blå mynt, som i
+  // Flappy Game. `drops` är det som faller där: det första oftast.
+  const WORLD_METERS = 20, WORLD_SPAN = WORLD_METERS * METER, WORLD_BONUS = 2;
+  const WORLDS = [
+    { name: 'Tegelväggen', wall: brickWall, colors: { mortar: '#dccab2', bricks: ['#b8513b', '#c25c44', '#ad4a35', '#c96a4f'] }, drops: ['kruka', 'tegel'] },
+    { name: 'Trästaketet', wall: plankWall, colors: { gap: '#6b4a2b', wood: ['#d9a066', '#cf9458', '#e0ab72'], grain: '#a8723f', knot: '#b98048', rail: '#b07a45' }, drops: ['kruka', 'apple'] },
+    { name: 'Slottsmuren', wall: stoneWall, colors: { mortar: '#5f6670', stones: ['#9aa3ad', '#8d96a1', '#a7afb8'], speck: '#6f7782' }, drops: ['sten', 'tegel'] },
+    { name: 'Djungelträdet', wall: barkWall, colors: { base: '#6b4a2b', line: '#4a3018', knot: '#7a5636', vine: '#3f8a34', leaf: '#5cb83a' }, drops: ['kokosnot', 'apple'] },
+    { name: 'Bambuskogen', wall: bambooWall, colors: { back: '#2f5a2a', stalk: ['#8cc84b', '#7dbb3f'], node: '#5f8f2a', leaf: '#4f9e2c' }, drops: ['kotte', 'kokosnot'] },
+    { name: 'Isberget', wall: iceWall, colors: { mortar: '#9fd3ea', ice: ['#d6f3ff', '#c5ecfb', '#e2f7ff'] }, drops: ['istapp', 'snoboll'] },
+    { name: 'Bergsklippan', wall: rockWall, colors: { base: '#7d7064', shades: ['#8a7d70', '#958878', '#74685c'], crack: '#4f453b' }, drops: ['sten', 'kotte'] },
+    { name: 'Badrummet', wall: tileWall, colors: { grout: '#c9d6e0', tiles: ['#ffffff', '#dff1ff'], size: 36 }, drops: ['burk', 'agg'] },
+    { name: 'Skyskrapan', wall: windowWall, colors: { base: '#4a5563', glass: '#7fb8e0', lit: '#ffe066' }, drops: ['kruka', 'burk'] },
+    { name: 'Godisväggen', wall: candyWall, colors: { base: '#ffc2e2', candies: ['#ff5e7a', '#4cc9f0', '#ffd23f', '#6fdc8c', '#a78bfa'] }, drops: ['klubba', 'apple'] },
+    { name: 'Bikupan', wall: hexWall, colors: { edge: '#c98f00', cells: ['#ffd23f', '#f5b301', '#ffe066'] }, drops: ['klubba', 'kotte'] },
+    { name: 'Rymdskeppet', wall: metalWall, colors: { seam: '#4a5563', panels: ['#c3ccd6', '#b8c4d0', '#ced6de'], rivet: '#7d8a97', lights: ['#e63946', '#2bb673', '#4cc9f0'] }, drops: ['mutter', 'burk'] },
+    { name: 'Pyramiden', wall: stoneWall, colors: { mortar: '#b08a50', stones: ['#e8c88a', '#dfbd7c', '#f0d49a'], speck: '#c9a466' }, drops: ['sten', 'kruka'] },
+    { name: 'Vulkanen', wall: rockWall, colors: { base: '#3a2a2a', shades: ['#4a3434', '#523a38', '#3f2e2e'], glow: '#ff6a1a' }, drops: ['sten', 'sten'] },
+    { name: 'Korallrevet', wall: rockWall, colors: { base: '#1f6f8b', shades: ['#ff8fa3', '#ffb347', '#5fd8c4', '#2a8fa8'], crack: '#165a70' }, drops: ['sten', 'burk'] },
+    { name: 'Ladan', wall: plankWall, colors: { gap: '#5a1a14', wood: ['#b5321f', '#a82b1a', '#c23a24'], grain: '#7a1f12', knot: '#8f2a1a', rail: '#f3e6c2' }, drops: ['agg', 'kruka'] },
+    { name: 'Spökhuset', wall: plankWall, colors: { gap: '#1d1a2a', wood: ['#4a3f5c', '#544868', '#3f3550'], grain: '#2a2238', knot: '#352c45', rail: '#2a2238' }, drops: ['bok', 'kruka'] },
+    { name: 'Trollkarlstornet', wall: stoneWall, colors: { mortar: '#2a3555', stones: ['#5a6a9a', '#4f5f8f', '#6575a5'], speck: '#ffe066' }, drops: ['bok', 'kruka'] },
+    { name: 'Pepparkakshuset', wall: brickWall, colors: { mortar: '#8a4a1f', bricks: ['#c27a3a', '#b86f30', '#cc8444'], icing: '#ffffff' }, drops: ['klubba', 'agg'] },
+    { name: 'Glaciären', wall: iceWall, colors: { mortar: '#3f8fc0', ice: ['#8fd3ff', '#7fc8f5', '#a5dcff'] }, drops: ['istapp', 'snoboll'] },
+    { name: 'Marmorpalatset', wall: tileWall, colors: { grout: '#c9c4bc', tiles: ['#f4f1ec', '#ebe6df', '#f9f7f3'], size: 60, vein: '#c9c0b4' }, drops: ['kruka', 'bok'] },
+    { name: 'Fabriken', wall: metalWall, colors: { seam: '#3a2f2a', panels: ['#9a6a4a', '#8a5c3e', '#a87656'], rivet: '#5a3e2a' }, drops: ['mutter', 'burk'] },
+    { name: 'Grottan', wall: rockWall, colors: { base: '#2f2b28', shades: ['#3d3834', '#46403b', '#36312d'], crack: '#1a1714' }, drops: ['sten', 'istapp'] },
+    { name: 'Regnbågsväggen', wall: brickWall, colors: { mortar: '#ffffff', bricks: RAINBOW }, drops: ['klubba', 'kruka'] },
+    { name: 'Månen', wall: craterWall, colors: { base: '#9a9fa8', crater: '#868b94', edge: '#6f747d' }, drops: ['sten', 'mutter'] },
+    { name: 'Biblioteket', wall: bookWall, colors: { back: '#5a3a22', shelf: '#8a5a2b', books: ['#e63946', '#2f6fd6', '#2bb673', '#ffd23f', '#9b6dff', '#ff8c1a', '#1d2b4f'] }, drops: ['bok', 'kruka'] },
+    { name: 'Köket', wall: tileWall, colors: { grout: '#d9d2bf', tiles: ['#ffffff', '#e63946'], size: 34 }, drops: ['agg', 'burk'] },
+    { name: 'Akvariet', wall: tileWall, colors: { grout: '#1f6f8b', tiles: ['#5fc8e8', '#4fbadc', '#6fd2ee'], size: 48, bubbles: true }, drops: ['sten', 'burk'] },
+    { name: 'Ostlandet', wall: cheeseWall, colors: { base: '#ffd23f', hole: '#e8b400', edge: '#c99400' }, drops: ['ost', 'apple'] },
+    { name: 'Klossväggen', wall: legoWall, colors: { gap: '#2a2a33', bricks: ['#e63946', '#2f80ed', '#ffd23f', '#2bb673', '#ff8c1a'] }, drops: ['klubba', 'bok'] },
+    { name: 'Chokladfabriken', wall: tileWall, colors: { grout: '#3f2414', tiles: ['#6b3f22', '#7a4a2a', '#5f371d'], size: 44 }, drops: ['klubba', 'agg'] },
+    { name: 'Fyren', wall: stripeWall, colors: { across: true, colors: ['#e63946', '#ffffff'] }, drops: ['burk', 'sten'] },
+    { name: 'Cirkustältet', wall: stripeWall, colors: { colors: ['#e63946', '#ffd23f'], dots: '#ffffff' }, drops: ['klubba', 'apple'] },
+    { name: 'Snögrottan', wall: iceWall, colors: { mortar: '#c9d6e6', ice: ['#ffffff', '#f0f6ff', '#e6f0fb'] }, drops: ['snoboll', 'istapp'] },
+    { name: 'Häcken', wall: hedgeWall, colors: { base: '#2f6b2a', leaves: ['#3f8a34', '#4f9e2c', '#5cb83a', '#367a2e'] }, drops: ['apple', 'kotte'] },
+    { name: 'Blomsterväggen', wall: hedgeWall, colors: { base: '#3f7a34', leaves: ['#4f9e2c', '#5cb83a', '#6cc84a'], flowers: ['#ff5e7a', '#ffd23f', '#a78bfa', '#ffffff'] }, drops: ['kruka', 'apple'] },
+    { name: 'Molnslottet', wall: cloudWall, colors: { sky: '#a8d8ff', cloud: '#ffffff' }, drops: ['snoboll', 'klubba'] },
+    { name: 'Tempelruinen', wall: stoneWall, colors: { mortar: '#4f5a3a', stones: ['#8a9070', '#7f866a', '#96a07c'], speck: '#5cb83a' }, drops: ['sten', 'kokosnot'] },
+    { name: 'Kristallgrottan', wall: hexWall, colors: { edge: '#3a2060', cells: ['#a78bfa', '#c3a8ff', '#8f6fe8', '#d8c8ff'] }, drops: ['istapp', 'sten'] },
+    { name: 'Rymdstationen', wall: metalWall, colors: { seam: '#1d2b4f', panels: ['#3a4a7a', '#33436f', '#425285'], rivet: '#7f8fbf', lights: ['#4cf0ff', '#ffd23f', '#ff5e7a'] }, drops: ['mutter', 'burk'] },
+    { name: 'Sandslottet', wall: stoneWall, colors: { mortar: '#d9b77a', stones: ['#f2dcaa', '#ead19a', '#f7e4b8'], speck: '#c9a466' }, drops: ['sten', 'burk'] },
+    { name: 'Skogsstugan', wall: plankWall, colors: { gap: '#3a2414', wood: ['#8a5a3a', '#7a4e30', '#96643f'], grain: '#5a3a22', knot: '#6b4423', rail: '#5a3a22' }, drops: ['kotte', 'apple'] },
+    { name: 'Guldväggen', wall: brickWall, colors: { mortar: '#8a6200', bricks: ['#ffd23f', '#f5b301', '#ffe066', '#e8c040'] }, drops: ['kruka', 'tegel'] },
+  ];
+  const worldIndex = h => Math.max(0, Math.floor(h / WORLD_SPAN)) % WORLDS.length;
+  const worldAt = h => WORLDS[worldIndex(h)];
+
+  // Väggen byter värld där höjden passerar en gräns, med en list emellan. Figuren
+  // sitter på höjden `climbed`, så en gräns syns uppifrån en bit innan den kommer.
+  function drawWall() {
+    const here = Math.floor(climbed / WORLD_SPAN);
+    const up = PLAYER_Y - ((here + 1) * WORLD_SPAN - climbed), down = PLAYER_Y + (climbed - here * WORLD_SPAN);
+    for (const [top, bottom, w] of [[VY0, up, here + 1], [up, down, here], [down, VY1, here - 1]]) {
+      const a = Math.max(top, VY0), b = Math.min(bottom, VY1);
+      if (b <= a) continue;
+      const world = WORLDS[Math.max(0, w) % WORLDS.length];
+      ctx.save();
+      ctx.beginPath(); ctx.rect(VX0, a, VW, b - a); ctx.clip();
+      world.wall(world.colors);
+      ctx.restore();
+    }
+    for (const y of here > 0 ? [up, down] : [up]) if (y > VY0 - 10 && y < VY1 + 10) ledge(y);
+    // mörkare mot kanterna, så att mitten syns
+    const g = ctx.createRadialGradient(W / 2, H / 2, 120, W / 2, H / 2, Math.max(VW, VH) * 0.7);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = g; ctx.fillRect(VX0, VY0, VW, VH);
+  }
+  function ledge(y) {
+    rr(VX0 - 6, y - 6, VW + 12, 12, 4); ctx.fillStyle = '#7a5230'; ctx.fill();
+    ctx.strokeStyle = '#4a2f18'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fillRect(VX0, y - 4, VW, 2);
+  }
+
+  // ---------- Väggarna ----------
+
+  // Rader som täcker skärmen och rullar med klättringen: fn(y, rad) för varje rad, där
+  // raden räknas i världen, så att samma rad ser likadan ut medan den rullar förbi.
+  function rows(height, fn) {
+    const offset = climbed % height, base = Math.floor(climbed / height);
+    for (let r = Math.floor((VY0 - offset) / height) - 1; r * height + offset < VY1 + height; r++) fn(r * height + offset, r - base);
+  }
+  // Kolumner över hela bredden som syns, förskjutna `shift`: fn(x, kolumn).
+  function cols(width, fn, shift = 0) {
+    for (let x = Math.floor((VX0 - shift) / width) * width + shift - width; x < VX1 + width; x += width) fn(x, Math.round((x - shift) / width));
+  }
+  function fillWall(color) { ctx.fillStyle = color; ctx.fillRect(VX0, VY0, VW, VH); }
+  const pick = (list, n) => list[n % list.length];
+  const odd = n => ((n % 2) + 2) % 2 === 1;
+
+  // Tegel: varannan rad förskjuten. Med `icing` får stenarna en kant av glasyr.
+  function brickWall(c) {
+    fillWall(c.mortar);
+    rows(20, (y, row) => cols(48, (x, col) => {
+      rr(x + 1.5, y + 1.5, 45, 17, 2.5);
+      ctx.fillStyle = pick(c.bricks, hash(row * 31 + col * 7 + 1000)); ctx.fill();
+      if (c.icing) { ctx.strokeStyle = c.icing; ctx.lineWidth = 1.6; ctx.stroke(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(x + 3, y + 3, 42, 2.5);
+    }, odd(row) ? 24 : 0));
+  }
+
+  // Stora huggna stenblock, med prickar i stenen.
+  function stoneWall(c) {
+    fillWall(c.mortar);
+    rows(40, (y, row) => cols(64, (x, col) => {
+      const h = hash(row * 37 + col * 11 + 7);
+      rr(x + 2, y + 2, 60, 36, 7);
+      ctx.fillStyle = pick(c.stones, h); ctx.fill();
+      blob(x + 10 + h % 40, y + 9 + (h >> 3) % 20, 1.6, c.speck);
+      blob(x + 30 + (h >> 2) % 25, y + 24 + (h >> 5) % 8, 1.3, c.speck);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x + 6, y + 5, 50, 3);
+    }, odd(row) ? 32 : 0));
+  }
+
+  // Isblock som glänser.
+  function iceWall(c) {
+    fillWall(c.mortar);
+    rows(44, (y, row) => cols(60, (x, col) => {
+      rr(x + 2, y + 2, 56, 40, 6);
+      ctx.fillStyle = pick(c.ice, hash(row * 23 + col * 5 + 3)); ctx.fill();
+      stroke([[x + 10, y + 32], [x + 22, y + 10]], 'rgba(255,255,255,0.6)', 2.5);
+      stroke([[x + 18, y + 34], [x + 26, y + 20]], 'rgba(255,255,255,0.35)', 2);
+    }, odd(row) ? 30 : 0));
+  }
+
+  // Plankor på höjden, med kvistar och tvärslåar.
+  function plankWall(c) {
+    fillWall(c.gap);
+    cols(40, (x, col) => { rr(x + 1.5, VY0 - 4, 37, VH + 8, 3); ctx.fillStyle = pick(c.wood, Math.abs(col)); ctx.fill(); });
+    rows(120, (y, row) => cols(40, (x, col) => {
+      const h = hash(row * 13 + col * 5 + 11);
+      stroke([[x + 10 + h % 6, y], [x + 12 + h % 6, y + 60], [x + 9 + h % 6, y + 120]], c.grain, 1.2);
+      if (h % 3 === 0) ovalEdge(x + 24, y + 20 + h % 70, 3.5, 5.5, c.knot, c.grain);
+    }));
+    rows(220, y => {
+      rr(VX0 - 4, y, VW + 8, 16, 3); ctx.fillStyle = c.rail; ctx.fill();
+      cols(40, x => { blob(x + 20, y + 5, 1.6, c.grain); blob(x + 20, y + 11, 1.6, c.grain); });
+    });
+  }
+
+  // Bark på en trädstam: ådror på höjden och kvistar.
+  function barkWall(c) {
+    fillWall(c.base);
+    rows(90, (y, row) => cols(26, (x, col) => {
+      const h = hash(row * 19 + col * 7 + 5);
+      stroke([[x + h % 8, y - 2], [x + 4 + h % 8, y + 45], [x + h % 8, y + 92]], c.line, 2.5);
+      if (h % 11 === 0) { ovalEdge(x + 13, y + 40, 6, 8, c.knot, c.line); oval(x + 13, y + 40, 2.5, 3.5, c.line); }
+    }));
+    if (c.vine) rows(160, (y, row) => {
+      const x = VX0 + 40 + hash(row * 3 + 1) % Math.max(1, Math.floor(VW - 80));
+      stroke([[x, y], [x + 12, y + 50], [x - 6, y + 110], [x + 4, y + 160]], c.vine, 3);
+      oval(x + 10, y + 46, 6, 3, c.leaf, 0.6); oval(x - 4, y + 104, 6, 3, c.leaf, -0.6);
+    });
+  }
+
+  // Bambu: stjälkar med knutar och några blad.
+  function bambooWall(c) {
+    fillWall(c.back);
+    cols(36, (x, col) => {
+      rr(x + 3, VY0 - 4, 30, VH + 8, 6); ctx.fillStyle = pick(c.stalk, Math.abs(col)); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(x + 7, VY0 - 4, 4, VH + 8);
+    });
+    rows(72, (y, row) => cols(36, (x, col) => {
+      const yy = y + hash(col * 17 + 3) % 72;
+      ctx.fillStyle = c.node; ctx.fillRect(x + 2, yy, 32, 4);
+      if (hash(row * 7 + col * 13) % 5 === 0) oval(x + 34, yy + 8, 10, 3.5, c.leaf, 0.5);
+    }));
+  }
+
+  // Klippa: runda stenar i olika toner och sprickor. Med `glow` lyser sprickorna, som lava.
+  function rockWall(c) {
+    fillWall(c.base);
+    rows(60, (y, row) => cols(60, (x, col) => {
+      const h = hash(row * 29 + col * 11 + 13);
+      blob(x + 10 + h % 40, y + 10 + (h >> 3) % 40, 14 + h % 14, pick(c.shades, h));
+    }));
+    rows(80, (y, row) => cols(70, (x, col) => {
+      const h = hash(row * 43 + col * 17 + 2);
+      if (h % 3) return;
+      const pts = [[x + h % 30, y + 10], [x + 18 + h % 20, y + 34], [x + 8 + h % 26, y + 58]];
+      if (c.glow) { stroke(pts, c.glow, 4); stroke(pts, '#ffe066', 1.5); }
+      else stroke(pts, c.crack, 1.8);
+    }));
+  }
+
+  // Kakel i ett rutnät. Med två färger blir det schackrutor; med `vein` marmor.
+  function tileWall(c) {
+    const s = c.size ?? 40;
+    fillWall(c.grout);
+    rows(s, (y, row) => cols(s, (x, col) => {
+      rr(x + 1.5, y + 1.5, s - 3, s - 3, 3);
+      ctx.fillStyle = c.tiles.length === 2 ? c.tiles[odd(row + col) ? 1 : 0] : pick(c.tiles, hash(row * 7 + col * 3 + 9)); ctx.fill();
+      if (c.vein) { const h = hash(row * 5 + col * 11); stroke([[x + 4, y + 6 + h % 20], [x + s / 2, y + s / 2], [x + s - 6, y + s - 8 - h % 14]], c.vein, 1); }
+      if (c.bubbles && hash(row * 3 + col * 7) % 4 === 0) { ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, 4, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x + 5, y + 4, s - 10, 3);
+    }));
+  }
+
+  // Fönster i ett höghus; några lyser.
+  function windowWall(c) {
+    fillWall(c.base);
+    rows(56, (y, row) => cols(48, (x, col) => {
+      rr(x + 8, y + 8, 32, 40, 3);
+      ctx.fillStyle = hash(row * 31 + col * 7) % 5 === 0 ? c.lit : c.glass; ctx.fill();
+      stroke([[x + 24, y + 8], [x + 24, y + 48]], c.base, 2);
+      stroke([[x + 12, y + 40], [x + 20, y + 14]], 'rgba(255,255,255,0.35)', 2);
+    }));
+  }
+
+  // Ränder, på höjden eller på bredden.
+  function stripeWall(c) {
+    if (c.across) rows(80, y => {
+      ctx.fillStyle = c.colors[0]; ctx.fillRect(VX0, y, VW, 40);
+      ctx.fillStyle = c.colors[1]; ctx.fillRect(VX0, y + 40, VW, 40);
+    });
+    else cols(60, (x, col) => {
+      ctx.fillStyle = c.colors[odd(col) ? 1 : 0]; ctx.fillRect(x, VY0, 60, VH);
+    });
+    if (c.dots) rows(60, (y, row) => cols(60, (x, col) => { if (hash(row * 7 + col) % 3 === 0) blob(x + 30, y + 30, 3, c.dots); }));
+  }
+
+  // Sexkanter, som i en bikupa eller en kristallgrotta.
+  function hexWall(c) {
+    fillWall(c.edge);
+    rows(31, (y, row) => cols(36, (x, col) => {
+      const cx = x + 18, cy = y + 15, p = [];
+      for (let k = 0; k < 6; k++) { const a = Math.PI / 6 + k * Math.PI / 3; p.push([cx + Math.cos(a) * 17, cy + Math.sin(a) * 17]); }
+      poly(p, pick(c.cells, hash(row * 13 + col * 7 + 4)));
+      blob(cx - 5, cy - 5, 2.5, 'rgba(255,255,255,0.3)');
+    }, odd(row) ? 18 : 0));
+  }
+
+  // Plåtar med nitar.
+  function metalWall(c) {
+    fillWall(c.seam);
+    rows(64, (y, row) => cols(96, (x, col) => {
+      rr(x + 2, y + 2, 92, 60, 4); ctx.fillStyle = pick(c.panels, hash(row * 11 + col * 3 + 1)); ctx.fill();
+      for (const [dx, dy] of [[8, 8], [86, 8], [8, 56], [86, 56]]) blob(x + dx, y + dy, 2.2, c.rivet);
+      if (c.lights && hash(row * 5 + col * 9) % 3 === 0) blob(x + 48, y + 32, 3.5, pick(c.lights, row + col));
+    }, odd(row) ? 48 : 0));
+  }
+
+  // Bokhyllor, fulla av böcker.
+  function bookWall(c) {
+    fillWall(c.back);
+    rows(70, (y, row) => {
+      let x = VX0 - 12 + hash(row + 5) % 10, n = 0;
+      while (x < VX1 + 12) {
+        const h = hash(row * 97 + n * 13 + 3), bw = 9 + h % 9, bh = 40 + (h >> 4) % 18;
+        rr(x, y + 62 - bh, bw, bh, 1.5); ctx.fillStyle = pick(c.books, h); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x + 1.5, y + 66 - bh, bw - 3, 2);
+        x += bw + 1; n++;
+      }
+      ctx.fillStyle = c.shelf; ctx.fillRect(VX0, y + 62, VW, 8);
+    });
+  }
+
+  // Ost med hål.
+  function cheeseWall(c) {
+    fillWall(c.base);
+    rows(80, (y, row) => cols(80, (x, col) => {
+      const h = hash(row * 17 + col * 23 + 6);
+      ovalEdge(x + 20 + h % 40, y + 20 + (h >> 5) % 40, 6 + h % 10, 5 + h % 8, c.hole, c.edge);
+    }));
+  }
+
+  // Byggklossar med knoppar.
+  function legoWall(c) {
+    fillWall(c.gap);
+    rows(28, (y, row) => cols(56, (x, col) => {
+      const color = pick(c.bricks, hash(row * 19 + col * 5 + 2));
+      rr(x + 1, y + 1, 54, 26, 3); ctx.fillStyle = color; ctx.fill();
+      for (const sx of [14, 42]) { blob(x + sx, y + 10, 6, 'rgba(0,0,0,0.15)'); blob(x + sx, y + 9, 6, color); blob(x + sx - 2, y + 7, 2, 'rgba(255,255,255,0.4)'); }
+    }, odd(row) ? 28 : 0));
+  }
+
+  // En häck av blad, ibland med blommor.
+  function hedgeWall(c) {
+    fillWall(c.base);
+    rows(22, (y, row) => cols(22, (x, col) => {
+      const h = hash(row * 41 + col * 13 + 8);
+      oval(x + 11, y + 11, 9, 5, pick(c.leaves, h), (h % 628) / 100);
+      if (c.flowers && h % 9 === 0) { for (let k = 0; k < 5; k++) blob(x + 11 + Math.cos(k * 1.26) * 3.5, y + 11 + Math.sin(k * 1.26) * 3.5, 2.6, pick(c.flowers, h >> 3)); blob(x + 11, y + 11, 2, '#ffd23f'); }
+    }));
+  }
+
+  // Månens yta med kratrar.
+  function craterWall(c) {
+    fillWall(c.base);
+    rows(90, (y, row) => cols(90, (x, col) => {
+      const h = hash(row * 31 + col * 19 + 4);
+      ovalEdge(x + 20 + h % 50, y + 20 + (h >> 4) % 50, 8 + h % 14, 6 + h % 10, c.crater, c.edge);
+      if (c.stars && h % 4 === 0) blob(x + (h >> 6) % 90, y + (h >> 2) % 90, 1.2, c.stars);
+    }));
+  }
+
+  // Moln att klättra på.
+  function cloudWall(c) {
+    fillWall(c.sky);
+    rows(110, (y, row) => cols(130, (x, col) => {
+      const h = hash(row * 7 + col * 29 + 1), cx = x + 35 + h % 60, cy = y + 50;
+      for (const [dx, dy, r] of [[-22, 6, 16], [0, -4, 22], [24, 6, 16], [0, 10, 18]]) blob(cx + dx, cy + dy, r, c.cloud);
+    }, odd(row) ? 65 : 0));
+  }
+
+  // Godis: runda karameller med virvlar.
+  function candyWall(c) {
+    fillWall(c.base);
+    rows(60, (y, row) => cols(60, (x, col) => {
+      const h = hash(row * 13 + col * 31 + 5), cx = x + 15 + h % 30, cy = y + 15 + (h >> 4) % 30;
+      blob(cx, cy, 10, pick(c.candies, h));
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 1.4); ctx.stroke();
+    }));
+  }
+
+  // ---------- Det som faller ----------
+
+  function drawRock(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    poly([[-12, -4], [-6, -12], [6, -11], [13, -2], [9, 10], [-4, 12], [-12, 6]], '#8b8f96', '#4f535b');
+    blob(-4, -5, 2.5, 'rgba(255,255,255,0.35)');
+    ctx.restore();
+  }
+  function drawIcicle(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(spin) * 0.2);
+    poly([[-8, -14], [8, -14], [0, 16]], '#d6f3ff', '#5fa8cc');
+    stroke([[-3, -11], [-1, 6]], 'rgba(255,255,255,0.8)', 1.5);
+    ctx.restore();
+  }
+  function drawSnowball(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    ovalEdge(0, 0, 12, 12, '#ffffff', '#8fa8c8');
+    blob(-4, -4, 3, '#e6eef8'); blob(5, 3, 2, '#e6eef8');
+    ctx.restore();
+  }
+  function drawCoconut(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    ovalEdge(0, 0, 12, 11, '#7a4a24', '#3f240f');
+    for (const [dx, dy] of [[-3, -3], [3, -3], [0, 2]]) blob(dx, dy, 1.8, '#3f240f');
+    ctx.restore();
+  }
+  function drawApple(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(spin) * 0.4);
+    ovalEdge(0, 2, 11.5, 10.5, '#e63946', '#9e1b25');
+    stroke([[0, -7], [1, -13]], '#5a3a22', 2);
+    oval(5, -11, 4.5, 2.2, '#3f8a34', -0.5);
+    blob(-4, -2, 2.4, 'rgba(255,255,255,0.45)');
+    ctx.restore();
+  }
+  function drawPinecone(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    ovalEdge(0, 0, 8.5, 13, '#a0703a', '#5a3a1b');
+    ctx.strokeStyle = '#5a3a1b'; ctx.lineWidth = 1.2;
+    for (const yy of [-7, -2, 3, 8]) { ctx.beginPath(); ctx.arc(-3, yy, 4, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke(); ctx.beginPath(); ctx.arc(3, yy, 4, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke(); }
+    ctx.restore();
+  }
+  function drawBook(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    rr(-11, -14, 22, 28, 2); ctx.fillStyle = '#2f6fd6'; ctx.fill(); ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#fffaf0'; ctx.fillRect(7, -12, 3, 24);
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(-11, -6, 18, 3);
+    ctx.restore();
+  }
+  function drawCan(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    rr(-9, -13, 18, 26, 3); ctx.fillStyle = '#c9d2dc'; ctx.fill(); ctx.strokeStyle = '#5f6b77'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#e63946'; ctx.fillRect(-9, -5, 18, 10);
+    stroke([[-9, -10], [9, -10]], '#5f6b77', 1); stroke([[-9, 10], [9, 10]], '#5f6b77', 1);
+    ctx.restore();
+  }
+  function drawEgg(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    ovalEdge(0, 0, 9, 12, '#fffaf0', '#b8a888');
+    blob(-3, -4, 2, '#ffffff');
+    ctx.restore();
+  }
+  function drawLolly(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    stroke([[0, 4], [0, 18]], '#f3e6c2', 3);
+    ovalEdge(0, -3, 10, 10, '#ff5e9a', '#b8326a');
+    ctx.strokeStyle = C.white; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, -3, 6, 0, Math.PI * 1.5); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, -3, 2.5, Math.PI, Math.PI * 2.6); ctx.stroke();
+    ctx.restore();
+  }
+  function drawNut(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    const p = [];
+    for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; p.push([Math.cos(a) * 12, Math.sin(a) * 12]); }
+    poly(p, '#a7b1bc', '#4a5563');
+    ovalEdge(0, 0, 5, 5, '#5f6b77', '#4a5563');
+    ctx.restore();
+  }
+  function drawCheese(x, y, spin) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(spin);
+    poly([[-13, 9], [13, 9], [13, -2], [-13, -9]], '#ffd23f', '#c99400');
+    blob(-4, 2, 2.6, '#e8b400'); blob(6, 4, 1.8, '#e8b400'); blob(5, -2, 1.5, '#e8b400');
+    ctx.restore();
+  }
+  const DROPS = {
+    kruka: drawPot, tegel: drawBrick, sten: drawRock, istapp: drawIcicle, snoboll: drawSnowball,
+    kokosnot: drawCoconut, apple: drawApple, kotte: drawPinecone, bok: drawBook, burk: drawCan,
+    agg: drawEgg, klubba: drawLolly, mutter: drawNut, ost: drawCheese,
+  };
+
   // ---------- Sakerna ----------
 
   function seg(x1, y1, x2, y2) {
@@ -2127,7 +2531,7 @@
       ctx.strokeStyle = C.ink; ctx.lineWidth = 3; ctx.stroke();
       say('Nytt rekord!', W / 2, py + 173, 18, { fill: C.ink, outline: null });
     } else {
-      say('Samla saker för fler meter', W / 2, py + 173, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+      say(`Värld ${worldIndex(climbed) + 1}: ${worldAt(climbed).name}`, W / 2, py + 173, 15, { font: BODY, weight: '800', fill: C.dirt, outline: null });
     }
     if (placed) say(`Plats ${placed} på topplistan!`, W / 2, py + 218, 18, { fill: C.ink, outline: null });
     if (time - overAt > 0.6) say('Tryck för att gå till startskärmen', W / 2, py + ph + 40, 20);
@@ -2137,6 +2541,15 @@
     if (state === 'ready' || state === 'over') return;
     say(`${meters()} m`, W / 2, UI_T + 46, 44);
     say(`Rekord ${best} m`, W / 2, UI_T + 80, 14, { font: BODY, weight: '800' });
+    say(`${worldAt(climbed).name} · värld ${worldIndex(climbed) + 1} av ${WORLDS.length}`, W / 2, UI_T + 100, 13, { font: BODY, weight: '800' });
+    const shown = (time - worldShownAt) / 2;
+    if (shown >= 0 && shown < 1) {
+      ctx.globalAlpha = shown < 0.75 ? 1 : (1 - shown) * 4;
+      say('Ny värld!', W / 2, 190, 40, { fill: C.banana });
+      say(worldAt(climbed).name, W / 2, 232, 26);
+      say(`+${WORLD_BONUS} blå mynt`, W / 2, 266, 18, { fill: C.blue });
+      ctx.globalAlpha = 1;
+    }
     for (const p of popups) {
       const k = (time - p.at) / 1.2;
       ctx.globalAlpha = 1 - k;
@@ -2165,7 +2578,7 @@
       // en skugga lyfter det som faller ut från väggen
       ctx.save();
       ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 5;
-      for (const f of falling) (f.kind === 'kruka' ? drawPot : drawBrick)(f.x, f.y, f.spin);
+      for (const f of falling) (DROPS[f.kind] ?? drawPot)(f.x, f.y, f.spin);
       ctx.restore();
       // uppe på väggen syns den bakifrån; när den faller vänder den sig om
       drawClimber(playerX, playerY, { dead: state !== 'playing', back: state === 'playing' });
@@ -2192,7 +2605,7 @@
     if (name === 'scores') refreshBoard();
   }
   function closeOverlay() { overlay = null; }
-  function toStart() { state = 'ready'; play('select', 0.4); }
+  function toStart() { state = 'ready'; climbed = 0; play('select', 0.4); }
 
   canvas.addEventListener('pointerdown', e => {
     e.preventDefault();

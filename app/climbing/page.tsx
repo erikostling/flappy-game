@@ -23,6 +23,7 @@ const DESCRIPTION = [
   'Samla mynt, bananer, paket, stjärnor och diamanter på väggen; de lyfter dig fler meter. Blå mynt köper figurer i Flappy Game.',
   'Väj för blomkrukor och tegelstenar som faller; träffas figuren faller den ner.',
   'Poängen är hur många meter du har klättrat. När du har fallit visas höjden och ditt rekord, och ett tryck tar dig tillbaka till startskärmen.',
+  'Var 20:e meter klättrar du in i en ny av 43 världar, med en egen vägg och egna saker som faller, och varje ny värld ger 2 blå mynt.',
   'Kommer du in på topplistan skriver du ditt namn där.',
   'Knapparna längst ner på startskärmen öppnar Figurer, Inställningar och Topplista; F och T fungerar också.',
   'Under Figurer väljer du vem som klättrar. Låsta figurer köper du där med blå mynt, till samma pris som i Flappy Game; priset står i hörnet. Figurerna och mynten är desamma i båda spelen.',
