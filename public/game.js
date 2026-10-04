@@ -788,7 +788,7 @@
 
     function loadSamples() {
       for (const name of SAMPLE_NAMES) {
-        fetch(`ljud/${name}.mp3`)
+        fetch(`/ljud/${name}.mp3`)
           .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer(); })
           .then(data => new Promise((resolve, reject) => ac.decodeAudioData(data, resolve, reject)))
           .then(buf => { samples[name] = buf; })
@@ -859,7 +859,7 @@
     // mellan slutet och början, och tonar över när världen byts.
     const TRACKS = Object.fromEntries(
       ['glad', 'lugn', 'spok', 'rymd', 'jul', 'djungel', 'strand', 'oken', 'slott', 'regnbage']
-        .map(name => [name, `musik/${name}.mp3`]));
+        .map(name => [name, `/musik/${name}.mp3`]));
     const buffers = {}, failed = {}, loading = {};
     let musicOn = load('flappy-apa-musik') !== 'av';
     let bus = null, current = null;

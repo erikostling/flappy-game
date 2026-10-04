@@ -20,7 +20,6 @@ body {
   background: var(--ground);
   color: var(--text);
   font-family: var(--font-body);
-  overflow: hidden;
   overscroll-behavior: none;
   /* Inget i spelet ska gå att markera av misstag; bara namnrutan tar text. */
   -webkit-user-select: none;

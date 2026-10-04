@@ -2,7 +2,7 @@
 
 Flyg genom tio världar, samla saker och blå mynt, köp nya figurer och ta dig in på topplistan.
 
-Byggt med Next.js. Själva spelet är en canvas som ritas av `public/game.js`. Topplistan sparas i Supabase via `/api/scores`.
+Byggt med Next.js. Första sidan är en spelväljare, och Flappy Game ligger på `/flappy`. Själva spelet är en canvas som ritas av `public/game.js`. Topplistan sparas i Supabase via `/api/scores`.
 
 ## Köra lokalt
 
@@ -11,7 +11,7 @@ pnpm install
 pnpm dev
 ```
 
-Öppna http://localhost:3000.
+Öppna http://localhost:3000. Där väljer du spel, och Flappy Game finns på http://localhost:3000/flappy.
 
 Topplistan behöver Supabase: kopiera `.env.example` till `.env.local` och fyll i projektets värden. Utan dem fungerar allt utom topplistan, som då visar att den inte går att hämta.
 
@@ -19,9 +19,11 @@ Topplistan behöver Supabase: kopiera `.env.example` till `.env.local` och fyll 
 
 | Sökväg | Vad |
 |---|---|
-| `app/page.tsx` | Sidan: canvasen och rutan för namn på topplistan |
+| `app/page.tsx`, `app/page.module.css` | Spelväljaren: ett kort per spel |
+| `app/flappy/page.tsx` | Flappy Game: canvasen och rutan för namn på topplistan |
 | `app/layout.tsx` | Typsnitt (next/font), titel och viewport |
-| `app/globals.css` | Spelets layout och stil |
+| `app/globals.css` | Gemensamma färger och typsnitt, och spelets layout och stil |
+| `public/spel/` | Bilderna på korten i spelväljaren |
 | `app/api/scores/route.ts` | API för topplistan: `GET` ger de tio bästa, `POST` sparar ett resultat |
 | `app/api/scores/claim/route.ts` | Kopplar ett namn från innan namnen fick ägare till enheten |
 | `lib/scores.ts` | Det API-vägarna delar: listan, enhetens nyckel |

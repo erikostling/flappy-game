@@ -1,50 +1,33 @@
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import Script from 'next/script';
+import styles from './page.module.css';
 
-// Adressen till spelet bär en hash av filen, räknad när sidan byggs. Ändras spelet
-// ändras adressen, så att ingen webbläsare kör en gammal version ur sin cache.
-const GAME_VERSION = createHash('sha256')
-  .update(readFileSync(join(process.cwd(), 'public', 'game.js')))
-  .digest('hex')
-  .slice(0, 12);
-
-// Hela spelet ritas på canvasen av public/game.js; sidan ger bara canvasen och
-// rutan där man skriver sitt namn på topplistan.
-const DESCRIPTION = [
-  'Flappy Game. Tryck på Starta, mellanslag eller Enter för att börja.',
-  'Klicka, tryck eller använd mellanslag för att flyga genom öppningarna mellan hindren.',
-  'Första gången väljer du en av tre startfigurer, en gång för alla.',
-  'Andra figurer köper du med blå mynt under Figurer; priset står på varje låst figur, från 3 till 45 blå mynt. Bläddra mellan sidorna med pilarna längst ner eller med vänster- och högerpil.',
-  'Mellan hindren kan du plocka upp en sköld som tar en krock, en magnet som drar till sig saker och slow motion.',
-  'Var 20:e poäng flyger du vidare till nästa av tio världar, med egen bakgrund, egna hinder och egen musik, och varje ny värld ger 2 blå mynt.',
-  'Från den sjätte världen blir öppningarna smalare och från den åttonde rör sig hindren.',
-  '10, 25 och 50 poäng i en omgång ger brons-, silver- och guldmedalj; dina medaljer visas uppe till vänster på startskärmen.',
-  'Knapparna längst ner på startskärmen öppnar Figurer, Inställningar och Topplista; F och T fungerar också.',
-  'Uppe till höger visas din figur och den högsta nivå du har nått.',
-  'M och N stänger av och sätter på ljudeffekter och musik.',
-].join(' ');
+// Första sidan: spelen att välja mellan. Varje spel är en egen sida. Länken laddar
+// spelets sida på nytt, så att ett spel börjar från början varje gång och slutar
+// spela musik när man går därifrån.
+const GAMES = [
+  {
+    href: '/flappy',
+    name: 'Flappy Game',
+    text: 'Flyg genom tio världar, samla blå mynt och köp nya figurer.',
+    image: '/spel/flappy-game.png',
+  },
+];
 
 export default function Home() {
   return (
-    <main className="stage" id="stage">
-      <div className="screen" id="screen">
-        <canvas id="game" tabIndex={0} aria-label={DESCRIPTION} />
-        <form className="entry" id="entry" hidden autoComplete="off">
-          <p className="entry-badge">Topp 10!</p>
-          <h2 className="entry-title" id="entry-title">Plats 1 med 10 poäng</h2>
-          <label htmlFor="entry-name">Ditt namn</label>
-          <input id="entry-name" name="name" maxLength={12} placeholder="Skriv ditt namn" enterKeyHint="done" />
-          <p className="entry-error" id="entry-error" hidden />
-          <div className="entry-actions">
-            <button type="submit" className="primary" id="entry-save">Spara</button>
-            <button type="button" className="secondary" id="entry-skip">Hoppa över</button>
-          </div>
-        </form>
-      </div>
-      <div className="safe" id="safe" aria-hidden="true" />
-      <Script src={`/game.js?v=${GAME_VERSION}`} strategy="afterInteractive" />
+    <main className={styles.page}>
+      <h1 className={styles.title}>Välj ett spel</h1>
+      <ul className={styles.games}>
+        {GAMES.map(game => (
+          <li key={game.href}>
+            <a className={styles.card} href={game.href}>
+              <img className={styles.image} src={game.image} alt="" width={512} height={512} />
+              <span className={styles.name}>{game.name}</span>
+              <span className={styles.text}>{game.text}</span>
+              <span className={styles.play}>Spela</span>
+            </a>
+          </li>
+        ))}
+      </ul>
     </main>
   );
 }
