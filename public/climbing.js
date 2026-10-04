@@ -1697,10 +1697,10 @@
 
   // ---------- Världarna ----------
 
-  // Var 20:e meter klättrar man in i en ny värld, med en egen vägg och egna saker som
+  // Var 40:e meter klättrar man in i en ny värld, med en egen vägg och egna saker som
   // faller; efter den sista börjar det om. Varje ny värld ger 2 blå mynt, som i
   // Flappy Game. `drops` är det som faller där: det första oftast.
-  const WORLD_METERS = 20, WORLD_SPAN = WORLD_METERS * METER, WORLD_BONUS = 2;
+  const WORLD_METERS = 40, WORLD_SPAN = WORLD_METERS * METER, WORLD_BONUS = 2;
   const WORLDS = [
     { name: 'Tegelväggen', wall: brickWall, colors: { mortar: '#dccab2', bricks: ['#b8513b', '#c25c44', '#ad4a35', '#c96a4f'] }, drops: ['kruka', 'tegel'] },
     { name: 'Trästaketet', wall: plankWall, colors: { gap: '#6b4a2b', wood: ['#d9a066', '#cf9458', '#e0ab72'], grain: '#a8723f', knot: '#b98048', rail: '#b07a45' }, drops: ['kruka', 'apple'] },
