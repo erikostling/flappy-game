@@ -1,76 +1,28 @@
-/* Climbing Games startskärm: en tegelvägg över hela skärmen, mörkare mot kanterna. */
-.screen {
+/* Climbing Game: canvasen över hela skärmen. Teglet bakom syns tills spelet har
+   laddat, så att sidan inte blinkar i en annan färg. */
+.game {
   position: fixed;
   inset: 0;
-  box-sizing: border-box;
-  padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
   background-color: #b8513b;
   background-image:
     radial-gradient(ellipse at center, transparent 40%, rgb(0 0 0 / .45)),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='32'%3E%3Crect width='64' height='32' fill='%23dccab2'/%3E%3Crect x='1' y='1' width='30' height='14' rx='2' fill='%23b8513b'/%3E%3Crect x='33' y='1' width='30' height='14' rx='2' fill='%23c25c44'/%3E%3Crect x='-15' y='17' width='30' height='14' rx='2' fill='%23c25c44'/%3E%3Crect x='17' y='17' width='30' height='14' rx='2' fill='%23ad4a35'/%3E%3Crect x='49' y='17' width='30' height='14' rx='2' fill='%23b8513b'/%3E%3C/svg%3E");
-  overflow: auto;
 }
 
-.back {
+.canvas {
   position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  left: max(16px, env(safe-area-inset-left));
-  padding: 8px 16px;
-  background: var(--panel);
-  color: var(--ink);
-  border: 3px solid var(--ink);
-  border-radius: 999px;
-  font-family: var(--font-display);
-  font-size: 18px;
-  text-decoration: none;
-}
-.back:focus-visible { outline: 3px solid var(--banana); outline-offset: 3px; }
-
-.title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-size: clamp(40px, 10vw, 64px);
-  color: var(--banana);
-  text-shadow: 0 4px 0 var(--ink), 0 0 2px var(--ink);
-  -webkit-text-stroke: 2px var(--ink);
-  paint-order: stroke fill;
-  text-align: center;
-}
-
-.hero {
+  inset: 0;
   display: block;
-  width: min(72vw, 46vh, 340px);
-  height: auto;
-  aspect-ratio: 1;
-  border: 4px solid var(--ink);
-  border-radius: 22px;
-  box-shadow: 0 8px 0 rgb(0 0 0 / .35);
+  touch-action: manipulation;
+  cursor: pointer;
+  outline: none;
 }
 
-.tagline {
-  margin: 0;
-  padding: 6px 14px;
-  background: rgb(29 43 31 / .7);
-  color: var(--text);
-  border-radius: 12px;
-  font-weight: 800;
-  font-size: 16px;
-  text-align: center;
+/* Läses av spelet: hur mycket notch och hemknapp tar från skärmens kanter. */
+.safe {
+  position: fixed;
+  inset: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  visibility: hidden;
+  pointer-events: none;
 }
-
-.start {
-  padding: 14px 40px;
-  background: var(--banana);
-  color: var(--ink);
-  border: 4px solid var(--ink);
-  border-radius: 999px;
-  font-family: var(--font-display);
-  font-size: 26px;
-}
-.start:disabled { opacity: .75; cursor: default; }

@@ -121,6 +121,15 @@
     { id: 'haxa', name: 'Häxa', world: 'Spöknatt', flight: 'Häxan flyger på sin kvast', draw: drawWitch },
     { id: 'sjojungfru', name: 'Sjöjungfru', world: 'Havet', flight: 'Sjöjungfrun simmar genom luften', draw: drawMermaid },
     { id: 'snogubbe', name: 'Snögubbe', world: 'Vinter', flight: 'Snögubben flaxar med pinnarmarna', draw: drawSnowman },
+    // åtta egna hjältar, med egna krafter; de kostar 75 blå mynt var
+    { id: 'natkastaren', name: 'Nätkastaren', world: 'Storstad', flight: 'Nätkastaren svingar sig fram i sina nät', draw: drawNatkastaren, price: 75 },
+    { id: 'plathjalten', name: 'Plåthjälten', world: 'Verkstad', flight: 'Plåthjälten flyger med raketstövlar', draw: drawPlathjalten, price: 75 },
+    { id: 'stenjatten', name: 'Stenjätten', world: 'Berg', flight: 'Stenjätten tar jättehopp', draw: drawStenjatten, price: 75 },
+    { id: 'nattkatten', name: 'Nattkatten', world: 'Natt', flight: 'Nattkatten smyger genom luften', draw: drawNattkatten, price: 75 },
+    { id: 'askflickan', name: 'Åskflickan', world: 'Åskmoln', flight: 'Åskflickan flyger med blixtar', draw: drawAskflickan, price: 75 },
+    { id: 'isblixten', name: 'Isblixten', world: 'Glaciär', flight: 'Isblixten glider på is', draw: drawIsblixten, price: 75 },
+    { id: 'vindhjalten', name: 'Vindhjälten', world: 'Himmel', flight: 'Vindhjälten bärs av vinden', draw: drawVindhjalten, price: 75 },
+    { id: 'eldhjalten', name: 'Eldhjälten', world: 'Vulkan', flight: 'Eldhjälten flyger på eld', draw: drawEldhjalten, price: 75 },
     // en gåva till Wilhelm, som var först på topplistan
     { id: 'guld', name: 'Guldperson', world: 'Guldland', flight: 'Guldpersonen flyger på gyllene vingar', draw: drawGold, gift: 'wilhelm' },
   ];
@@ -531,7 +540,7 @@
     try { return Math.max(0, Math.floor(Number(JSON.parse(load('flappy-apa-medaljer') || '{}')[m.id]) || 0)); } catch { return 0; }
   });
   let time = 0, overAt = 0, flash = 0, groundX = 0, hillX = 0, travel = 0;
-  let overlay = null; // null | 'figures' | 'settings' | 'scores' | 'entry'
+  let overlay = null; // null | 'figures' | 'settings' | 'scores'
   let paused = false;
 
   // Första gången väljer man en av tre startfigurer. Den blir ens första figur och
@@ -541,9 +550,11 @@
   // Priset i blå mynt för varje grupp om fem figurer att köpa: de fem första kostar 3,
   // de fem nästa 5, och så vidare. Först kommer de två andra startfigurerna, sedan
   // resten i samlingens ordning, så priset är detsamma vilken man än valde först.
+  // En figur med eget pris, som hjältarna, kostar det.
   const PRICES = [3, 5, 10, 15, 20, 25, 30, 35, 40, 45], PRICE_GROUP = 5;
-  const OTHER_FIGURES = CHARACTERS.filter(c => !c.gift).map(c => c.id).filter(id => !START_FIGURES.includes(id));
+  const OTHER_FIGURES = CHARACTERS.filter(c => !c.gift && !c.price).map(c => c.id).filter(id => !START_FIGURES.includes(id));
   function figurePrice(ci) {
+    if (CHARACTERS[ci].price) return CHARACTERS[ci].price;
     const id = CHARACTERS[ci].id;
     const place = START_FIGURES.includes(id) ? 0 : START_FIGURES.length - 1 + OTHER_FIGURES.indexOf(id);
     return PRICES[Math.floor(place / PRICE_GROUP)];
@@ -582,7 +593,14 @@
   // äger namnet på topplistan, vilket servern säger (`ownedNames`). Den blir vald
   // direkt, och startskärmen säger vem den är till tills omgången börjar.
   let giftNote = '', ownedNames = new Set();
+  // Den som gör spelet har alla figurer: enheten som äger namnet MAKER på någon av
+  // topplistorna. Climbing Game gör likadant.
+  const MAKER = 'admin';
   function giveGifts(withSound) {
+    if (!choosingFirst() && ownedNames.has(MAKER) && CHARACTERS.some(c => !unlocked.has(c.id))) {
+      CHARACTERS.forEach(c => unlocked.add(c.id));
+      store('flappy-apa-upplasta', JSON.stringify([...unlocked]));
+    }
     CHARACTERS.forEach((c, ci) => {
       if (choosingFirst() || !c.gift || !ownedNames.has(c.gift) || unlocked.has(c.id)) return;
       unlocked.add(c.id);
@@ -663,7 +681,8 @@
   // först; enheten känns igen på en slumpad nyckel som bara finns här.
   let mode = 'loading'; // 'loading' | 'ready' | 'error'
   let topList = [];
-  let entryScore = 0, pendingEntry = false, afterSave = false, savedEntry = null, saving = false;
+  // efter ett fall: resultatet som sparades på listan, och om listan ska visas
+  let afterSave = false, savedEntry = null;
 
   function cleanEntries(raw) {
     if (!Array.isArray(raw)) return [];
@@ -697,7 +716,6 @@
     const b = board();
     return mode === 'ready' && s > 0 && (b.length < TOP || s > b[TOP - 1].score);
   }
-  const rankFor = s => board().filter(e => e.score >= s).length + 1;
 
   function deviceKey() {
     let key = load('flappy-apa-nyckel');
@@ -738,17 +756,17 @@
   if (savedName) refreshBoard('/api/scores/claim', { name: savedName });
   else refreshBoard();
 
-  async function saveEntry(name) {
-    const score = entryScore;
-    await scoresRequest('/api/scores', { name, score, figure: CHARACTERS[charIndex].id }, true);
-    // raden som servern sparade, så att den markeras på listan
-    return topList.find(e => nameKey(e.name) === nameKey(name) && e.score === score) ?? null;
-  }
-
-  function saveError(err) {
-    if (err?.status === 409) return 'Det namnet hör till någon annan. Välj ett annat.';
-    if (err?.status === 429) return 'Listan tar inte emot fler namn just nu.';
-    return 'Det gick inte att spara. Försök igen.';
+  // Kommer man in på topplistan sparas resultatet av sig självt, under namnet man
+  // valde första gången (public/player.js), och listan visas med ens rad markerad.
+  // Utan namn sparas inget.
+  async function saveResult(score) {
+    const name = window.player?.name?.();
+    if (!name || !qualifies(score)) return;
+    try {
+      await scoresRequest('/api/scores', { name, score, figure: CHARACTERS[charIndex].id }, true);
+      savedEntry = topList.find(e => nameKey(e.name) === nameKey(name) && e.score === score) ?? null;
+      if (savedEntry && state === 'over') { afterSave = true; overAt = time; sfx.select(); }
+    } catch {}
   }
 
   // ---------- Ljud ----------
@@ -1003,6 +1021,8 @@
     blackfisk: 'bubble', groda: 'boing', ko: 'moo', hund: 'woof', enhorning: 'chime', sol: 'chime', tomte: 'chime', guld: 'chime', prinsessa: 'chime',
     haj: 'bubble', delfin: 'bubble', sjojungfru: 'bubble', pirat: 'jet', trollkarl: 'chime', haxa: 'woo',
     skoldpadda: 'buzz', nyckelpiga: 'buzz',
+    natkastaren: 'zap', plathjalten: 'jet', stenjatten: 'boing', nattkatten: 'woo',
+    askflickan: 'zap', isblixten: 'chime', vindhjalten: 'wing', eldhjalten: 'fire',
   };
 
   // ---------- Spelets gång ----------
@@ -1014,7 +1034,7 @@
     items = []; popups = []; box = ITEMS.map(() => 0);
     powers = []; shield = false; magnetUntil = slowUntil = safeUntil = 0; medal = -1;
     worldStep = 0; nextWorldAt = WORLD_EVERY;
-    pendingEntry = false; afterSave = false; savedEntry = null;
+    afterSave = false; savedEntry = null;
   }
 
   // Nästa värld i ordningen; hinder som redan syns behåller sin sort. Varje ny värld
@@ -1090,7 +1110,7 @@
       sfx.flap(FLAP_SOUND[CHARACTERS[charIndex].id]);
       return;
     }
-    if (state === 'over' && !pendingEntry && time - overAt > 0.6) reset();
+    if (state === 'over' && time - overAt > 0.6) reset();
   }
 
   function crash() {
@@ -1105,8 +1125,7 @@
       store('flappy-apa-lada', JSON.stringify(Object.fromEntries(ITEMS.map((it, i) => [it.id, lifetime[i]]))));
     }
     if (score > best) { best = score; newBest = true; store('flappy-apa-best', best); sfx.fanfare(0.45); }
-    entryScore = score;
-    pendingEntry = qualifies(score);
+    saveResult(score);
   }
 
   function openOverlay(name) {
@@ -1165,7 +1184,6 @@
     time += dt;
     flash = Math.max(0, flash - dt * 4);
     player.flapT = Math.max(0, player.flapT - dt);
-    if (state === 'over' && pendingEntry && !overlay && time - overAt > 0.9) openEntry();
     if (overlay || paused) return;
     if (time < slowUntil) dt *= SLOW;
 
@@ -1239,67 +1257,6 @@
     }
     return list.filter(it => !it.taken && it.x > VX0 - 30);
   }
-
-  // ---------- Namnrutan ----------
-
-  const entryForm = document.getElementById('entry');
-  const entryTitle = document.getElementById('entry-title');
-  const entryName = document.getElementById('entry-name');
-  const entrySave = document.getElementById('entry-save');
-  const entrySkip = document.getElementById('entry-skip');
-  const entryError = document.getElementById('entry-error');
-
-  function showEntryError(text) { entryError.textContent = text; entryError.hidden = false; }
-
-  function openEntry() {
-    pendingEntry = false;
-    overlay = 'entry';
-    entryTitle.textContent = `Plats ${rankFor(entryScore)} med ${entryScore} poäng`;
-    entryName.value = load('flappy-apa-namn') || '';
-    entryError.hidden = true;
-    entrySave.disabled = false;
-    entrySave.textContent = 'Spara';
-    entryForm.hidden = false;
-    entryName.focus({ preventScroll: true });
-    entryName.select();
-  }
-
-  function closeEntry() {
-    entryForm.hidden = true;
-    closeOverlay();
-  }
-
-  entryForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    if (saving) return;
-    const name = entryName.value.replace(/\s+/g, ' ').trim().slice(0, 12);
-    if (!name) { showEntryError('Skriv ett namn först.'); entryName.focus(); return; }
-    const held = board().find(e => nameKey(e.name) === nameKey(name));
-    if (held && held.score >= entryScore) {
-      showEntryError(ownedNames.has(nameKey(name))
-        ? `Ditt bästa på listan är redan ${held.score} poäng.`
-        : `${held.name} har redan ${held.score} poäng på listan. Välj ett annat namn eller hoppa över.`);
-      entryName.focus();
-      return;
-    }
-    saving = true;
-    entrySave.disabled = true;
-    entrySave.textContent = 'Sparar…';
-    try {
-      savedEntry = await saveEntry(name);
-      store('flappy-apa-namn', name);
-      afterSave = true; overAt = time;
-      sfx.select();
-      closeEntry();
-    } catch (err) {
-      showEntryError(saveError(err));
-      entrySave.disabled = false;
-      entrySave.textContent = 'Spara';
-    } finally {
-      saving = false;
-    }
-  });
-  entrySkip.addEventListener('click', closeEntry);
 
   // ---------- Ritverktyg ----------
 
@@ -3245,6 +3202,228 @@
     ctx.beginPath(); ctx.arc(8, -5, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
   }
 
+  // ---------- Hjältarna ----------
+
+  // De åtta egna hjältarna flyger som Superhjälten: benen bakåt och en knytnäve framåt.
+  // Var och en har sina färger, sitt huvud, ett märke på bröstet och det som syns runt
+  // den när den flyger.
+  const HJALTE = {
+    natkastaren: { suit: '#2bb673', dark: '#1a7f50', glove: '#1d1d1d', boot: '#1d1d1d' },
+    plathjalten: { suit: '#c3ccd6', dark: '#5f6b77', glove: '#2f6fd6', boot: '#2f6fd6' },
+    stenjatten: { suit: '#8a8f98', dark: '#5c6068', glove: '#8a8f98', boot: '#5c6068' },
+    nattkatten: { suit: '#1d2450', dark: '#0f1430', glove: '#1d2450', boot: '#0f1430' },
+    askflickan: { suit: '#7b3fb8', dark: '#4a2275', glove: '#ffd23f', boot: '#ffd23f', cape: '#ffd23f', capeDark: '#c99400' },
+    isblixten: { suit: '#8fd3ff', dark: '#2f78b8', glove: '#ffffff', boot: '#ffffff' },
+    vindhjalten: { suit: '#2bb6a0', dark: '#1a7f70', glove: '#ffffff', boot: '#1a7f70' },
+    eldhjalten: { suit: '#e8503a', dark: '#b5321f', glove: '#ffd23f', boot: '#ffd23f' },
+  };
+  const HERO_SKIN = '#ffd6b8';
+
+  function flyingHero(h, { boost, dead }, { behind, chest, head }) {
+    if (behind) behind(boost, dead);
+    if (h.cape) {
+      const speed = boost ? 18 : 10, w1 = Math.sin(time * speed) * 3, w2 = Math.sin(time * speed + 1.4) * 4;
+      ctx.beginPath();
+      ctx.moveTo(-2, -4);
+      ctx.quadraticCurveTo(-16, -10 + w1, -32, -6 + w2);
+      ctx.quadraticCurveTo(-28, 2 + w1, -31, 10 + w2);
+      ctx.quadraticCurveTo(-16, 8, -4, 6);
+      ctx.closePath();
+      ctx.fillStyle = h.cape; ctx.fill();
+      ctx.strokeStyle = h.capeDark; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    oval(-14, 13, 7, 3.5, h.dark);
+    oval(-21, 13.5, 3.6, 3.4, h.boot);
+    oval(-16, 9, 8, 3.8, h.suit);
+    oval(-24, 9.5, 4, 3.8, h.boot);
+    ovalEdge(-4, 6, 12, 8, h.suit, h.dark);
+    if (chest) chest();
+    oval(12, 1, 7, 3.2, h.suit);
+    blob(19, 1, 3.6, h.glove);
+    head(dead);
+  }
+  // två ögon i trekvartsprofil, som Superhjältens
+  function heroEyes(dead, y = -10, color = C.white) {
+    if (dead) { xEye(3, y, 2, color === C.white ? C.ink : color); xEye(10, y, 2, color === C.white ? C.ink : color); return; }
+    oval(3, y, 2.2, 2, color); oval(10, y, 2.2, 2, color);
+    blob(3.6, y + 0.3, 1, C.ink); blob(10.6, y + 0.3, 1, C.ink);
+  }
+  function heroSmile(color = '#8a4a2a') {
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(8, -5, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  }
+
+  // Nätkastaren: grön dräkt med nät och stora vita ögon, och en tråd från handen
+  function drawNatkastaren(o) {
+    const h = HJALTE.natkastaren;
+    flyingHero(h, o, {
+      behind: boost => { if (boost) { ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(22, 1); ctx.lineTo(40, -14); ctx.stroke(); } },
+      chest: () => {
+        blob(-2, 5, 2.2, '#1d1d1d'); blob(-2, 8.5, 1.6, '#1d1d1d');
+        ctx.strokeStyle = '#1d1d1d'; ctx.lineWidth = 0.9;
+        for (const s of [-1, 1]) for (const dy of [-1.5, 0.5, 2.5]) { ctx.beginPath(); ctx.moveTo(-2, 5.5 + dy * 0.5); ctx.lineTo(-2 + s * 5, 4 + dy * 1.6); ctx.stroke(); }
+      },
+      head: dead => {
+        ovalEdge(5, -9, 9.5, 9.5, h.suit, h.dark);
+        ctx.strokeStyle = h.dark; ctx.lineWidth = 0.8;
+        for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; ctx.beginPath(); ctx.moveTo(5, -9); ctx.lineTo(5 + Math.cos(a) * 9.5, -9 + Math.sin(a) * 9.5); ctx.stroke(); }
+        for (const r of [4, 7]) { ctx.beginPath(); ctx.arc(5, -9, r, 0, Math.PI * 2); ctx.stroke(); }
+        if (dead) { xEye(3, -10, 2.2, '#1d1d1d'); xEye(10, -10, 2.2, '#1d1d1d'); }
+        else { ovalEdge(2.5, -10.5, 3, 3.8, C.white, '#1d1d1d', -0.4); ovalEdge(10, -10.5, 3, 3.8, C.white, '#1d1d1d', 0.4); }
+      },
+    });
+  }
+
+  // Plåthjälten: silverrustning med blått visir och raketstövlar
+  function drawPlathjalten(o) {
+    const h = HJALTE.plathjalten;
+    flyingHero(h, o, {
+      behind: boost => {
+        const f = boost ? 1 : 0.55;
+        poly([[-27, 9.5], [-27 - 10 * f, 7.5], [-27 - 16 * f, 9.5], [-27 - 10 * f, 11.5]], '#ff9f1c');
+        poly([[-27, 9.5], [-27 - 6 * f, 8.5], [-27 - 10 * f, 9.5], [-27 - 6 * f, 10.5]], '#ffe066');
+      },
+      chest: () => { star(-2, 5, 4.5, '#4cf0ff'); blob(-2, 5, 1.6, C.white); },
+      head: dead => {
+        ovalEdge(5, -9, 9.5, 9.5, h.suit, h.dark);
+        rr(0, -14, 13, 9, 3); ctx.fillStyle = '#2f6fd6'; ctx.fill();
+        if (dead) { xEye(3.5, -10.5, 1.8, '#4cf0ff'); xEye(9.5, -10.5, 1.8, '#4cf0ff'); }
+        else { ctx.fillStyle = '#4cf0ff'; rr(2, -11.5, 4, 1.8, 0.9); ctx.fill(); rr(8, -11.5, 4, 1.8, 0.9); ctx.fill(); }
+        oval(1, -15, 3, 1.5, 'rgba(255,255,255,0.6)', -0.4);
+      },
+    });
+  }
+
+  // Stenjätten: stor och grå som berget, med sprickor och orange shorts
+  function drawStenjatten(o) {
+    const h = HJALTE.stenjatten;
+    ctx.save(); ctx.scale(1.12, 1.12);
+    flyingHero(h, o, {
+      chest: () => {
+        oval(-11, 8, 6, 5.5, '#ff8c1a');
+        ctx.strokeStyle = h.dark; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(3, 5); ctx.lineTo(1, 9); ctx.stroke();
+      },
+      head: dead => {
+        ovalEdge(5, -9, 10.5, 10, h.suit, h.dark);
+        ctx.strokeStyle = h.dark; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(-2, -16); ctx.lineTo(1, -12); ctx.lineTo(-1, -8); ctx.stroke();
+        rr(-1, -15, 16, 3.5, 1.7); ctx.fillStyle = h.dark; ctx.fill();
+        if (dead) { xEye(4, -10, 1.8); xEye(10, -10, 1.8); }
+        else { blob(4, -10, 1.7, C.white); blob(10, -10, 1.7, C.white); blob(4.4, -9.8, 0.9, C.ink); blob(10.4, -9.8, 0.9, C.ink); }
+        ctx.strokeStyle = h.dark; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(3, -4); ctx.lineTo(12, -4.5); ctx.stroke();
+      },
+    });
+    ctx.restore();
+  }
+
+  // Nattkatten: mörkblå dräkt med kattöron, guldögon och guldklor
+  function drawNattkatten(o) {
+    const h = HJALTE.nattkatten;
+    flyingHero(h, o, {
+      chest: () => { for (let k = 0; k < 5; k++) poly([[-7 + k * 2.5, 0], [-5 + k * 2.5, 0], [-6 + k * 2.5, 2.5]], '#ffd23f'); },
+      head: dead => {
+        poly([[-1, -15], [0, -23], [5, -17]], h.suit, h.dark);
+        poly([[6, -17], [11, -23], [12, -14]], h.suit, h.dark);
+        ovalEdge(5, -9, 9.5, 9.5, h.suit, h.dark);
+        if (dead) { xEye(3, -10, 2, '#ffd23f'); xEye(10, -10, 2, '#ffd23f'); }
+        else { oval(3, -10, 2.8, 1.2, '#ffd23f', 0.25); oval(10, -10, 2.8, 1.2, '#ffd23f', -0.25); }
+        ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(6.5, -7); ctx.lineTo(6.5, -4); ctx.stroke();
+      },
+    });
+    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+    for (const dy of [-2, 0, 2]) { ctx.beginPath(); ctx.moveTo(22, 1 + dy); ctx.lineTo(25, 1 + dy * 1.4); ctx.stroke(); }
+  }
+
+  // Åskflickan: lila dräkt med blixt, gul mantel och gult hår, och gnistor
+  function drawAskflickan(o) {
+    const h = HJALTE.askflickan;
+    flyingHero(h, o, {
+      behind: (boost, dead) => {
+        if (!boost || dead) return;
+        ctx.strokeStyle = '#ffe066'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+        for (const y of [-6, 12]) { ctx.beginPath(); ctx.moveTo(-30, y); ctx.lineTo(-36, y + 4); ctx.lineTo(-33, y + 5); ctx.lineTo(-40, y + 10); ctx.stroke(); }
+      },
+      chest: () => poly([[0, -1], [-4, 6], [-1, 6], [-3, 12], [3, 3], [0, 3], [2, -1]], '#ffd23f'),
+      head: dead => {
+        oval(-1, -8, 9, 7, '#ffcf5a', 0.3);
+        oval(5, -9, 9.5, 9.5, HERO_SKIN);
+        oval(5, -16, 9, 4.5, '#ffcf5a');
+        heroEyes(dead);
+        heroSmile();
+      },
+    });
+  }
+
+  // Isblixten: ljusblå dräkt med snöflinga, vitt taggigt hår och is efter sig
+  function drawIsblixten(o) {
+    const h = HJALTE.isblixten;
+    flyingHero(h, o, {
+      behind: (boost, dead) => {
+        if (dead) return;
+        for (const [x, y, r] of [[-30, 2, 2.4], [-38, 8, 1.8], [-34, 14, 1.6]]) star(x + Math.sin(time * 6 + x) * 1.5, y, r * (boost ? 1.4 : 1), C.white);
+      },
+      chest: () => {
+        ctx.strokeStyle = C.white; ctx.lineWidth = 1.3;
+        for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; ctx.beginPath(); ctx.moveTo(-2 + Math.cos(a) * 4.5, 5 + Math.sin(a) * 4.5); ctx.lineTo(-2 - Math.cos(a) * 4.5, 5 - Math.sin(a) * 4.5); ctx.stroke(); }
+      },
+      head: dead => {
+        for (const [x, y] of [[-3, -12], [0, -17], [5, -20], [10, -19]]) poly([[x, y + 4], [x - 6, y - 2], [x + 3, y + 1]], C.white, '#b9c8dc');
+        oval(5, -9, 9.5, 9.5, HERO_SKIN);
+        oval(5, -16, 8.5, 3.6, C.white);
+        heroEyes(dead);
+        heroSmile();
+      },
+    });
+  }
+
+  // Vindhjälten: turkos dräkt med virvel, flygglasögon och vind efter sig
+  function drawVindhjalten(o) {
+    const h = HJALTE.vindhjalten;
+    flyingHero(h, o, {
+      behind: (boost, dead) => {
+        if (dead) return;
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+        const w = time * (boost ? 14 : 8);
+        for (const [y, len] of [[-4, 14], [6, 18], [16, 12]]) { ctx.beginPath(); ctx.moveTo(-30, y); ctx.quadraticCurveTo(-30 - len / 2, y - 3 + Math.sin(w + y) * 2, -30 - len, y); ctx.stroke(); }
+      },
+      chest: () => { ctx.strokeStyle = C.white; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(-2, 5, 3.5, 0, Math.PI * 1.5); ctx.stroke(); ctx.beginPath(); ctx.arc(-2, 5, 1.3, Math.PI, Math.PI * 2.4); ctx.stroke(); },
+      head: dead => {
+        oval(5, -9, 9.5, 9.5, HERO_SKIN);
+        oval(4, -16, 9, 4.5, '#6b4423');
+        poly([[-3, -16], [-9, -13], [-2, -12]], '#6b4423');
+        ctx.strokeStyle = '#3a2f33'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(-4, -10.5); ctx.lineTo(0, -10.5); ctx.stroke();
+        if (dead) { xEye(3, -10.5, 2); xEye(10, -10.5, 2); }
+        else { ovalEdge(3, -10.5, 2.8, 2.6, '#ffd23f', '#3a2f33'); ovalEdge(10, -10.5, 2.8, 2.6, '#ffd23f', '#3a2f33'); }
+        heroSmile();
+      },
+    });
+  }
+
+  // Eldhjälten: röd dräkt med låga, hår av eld och eld efter sig
+  function flame(x, y, len, w) {
+    const f = Math.sin(time * 14 + x) * 1.5;
+    poly([[x, y - w], [x - len, y + f], [x, y + w]], '#ff9f1c');
+    poly([[x, y - w * 0.55], [x - len * 0.6, y + f * 0.6], [x, y + w * 0.55]], '#ffe066');
+  }
+  function drawEldhjalten(o) {
+    const h = HJALTE.eldhjalten;
+    flyingHero(h, o, {
+      behind: (boost, dead) => { if (!dead) { flame(-26, 10, boost ? 18 : 10, 3.5); flame(-19, 14, boost ? 14 : 8, 3); } },
+      chest: () => { poly([[-2, -1], [-6, 6], [-2, 11], [2, 6]], '#ffd23f'); poly([[-2, 3], [-4, 7], [-2, 10], [0, 7]], '#ff9f1c'); },
+      head: dead => {
+        if (!dead) { flame(-1, -12, 12, 4); flame(2, -17, 10, 3.5); flame(7, -19, 8, 3); }
+        oval(5, -9, 9.5, 9.5, HERO_SKIN);
+        oval(5, -16, 8.5, 3.6, '#ff9f1c');
+        heroEyes(dead);
+        heroSmile();
+      },
+    });
+  }
+
   // En person i guld som flyger med gyllene vingar, med krona och gnistor runt sig.
   function drawGold({ beat, dead }) {
     featherWing(-8, 2, 0.8 + beat, GULD.dark, GULD.edge);
@@ -4435,8 +4614,10 @@
   const settingsBtn = () => bottomBtn((W - BTN_W) / 2);
   const scoresBtn = () => bottomBtn(W - 14 - BTN_W);
   const startBtn = () => ({ x: W / 2 - 110, y: 386 + MID, w: 220, h: 64 });
-  const levelBadge = () => ({ x: UI_R - 14 - 132, y: UI_T + 14, w: 132, h: 44 });
-  const medalBadge = () => ({ x: UI_L + 14, y: UI_T + 14, w: 132, h: 44 });
+  const levelBadge = () => ({ x: UI_R - 14 - 120, y: UI_T + 14, w: 120, h: 44 });
+  // medaljerna i mitten, så att knappen tillbaka till spelväljaren får hörnet; båda
+  // brickorna är smala nog att få plats bredvid den på en mobil
+  const medalBadge = () => ({ x: W / 2 - 58, y: UI_T + 14, w: 116, h: 44 });
 
   function drawGear(cx, cy) {
     ctx.save();
@@ -4490,11 +4671,11 @@
     const b = medalBadge();
     drawButtonFrame(b, false);
     MEDALS.forEach((m, i) => {
-      const x = b.x + 18 + i * 40;
+      const x = b.x + 16 + i * 34;
       ctx.globalAlpha = medalCount[i] ? 1 : 0.35;
       drawMedal(m, x, b.y + 25, 9);
       ctx.globalAlpha = 1;
-      say(String(medalCount[i]), x + 13, b.y + 25, 15, { font: BODY, weight: '800', fill: C.ink, stroke: null, align: 'left' });
+      say(String(medalCount[i]), x + 12, b.y + 25, 15, { font: BODY, weight: '800', fill: C.ink, stroke: null, align: 'left' });
     });
   }
 
@@ -4742,8 +4923,6 @@
   }
 
   function drawOver() {
-    if (overlay === 'entry') { dim(); return; }
-    if (pendingEntry) { say('Krasch!', W / 2, 130, 56, { fill: C.banana }); return; }
     if (afterSave) { drawBoard('again'); return; }
 
     const pw = 250, ph = 262, px = W / 2 - pw / 2, py = 165;
@@ -4854,7 +5033,8 @@
 
   canvas.addEventListener('pointerdown', e => {
     e.preventDefault();
-    if (overlay === 'entry') return;
+    // medan namnrutan är öppen startar inget
+    if (window.player?.busy?.()) return;
     canvas.focus({ preventScroll: true });
     sfx.unlock();
     const p = toWorld(e);
@@ -4883,7 +5063,7 @@
   });
 
   window.addEventListener('keydown', e => {
-    if (overlay === 'entry') { if (e.code === 'Escape') closeEntry(); return; }
+    if (window.player?.busy?.()) return;
     sfx.unlock();
     if (e.code === 'KeyM') { e.preventDefault(); sfx.toggleSfx(); return; }
     if (e.code === 'KeyN') { e.preventDefault(); sfx.toggleMusic(); return; }
@@ -4909,11 +5089,16 @@
   });
 
   let last = 0;
+  // Knappen tillbaka till spelväljaren syns bara på startskärmen, när ingen ruta är
+  // öppen; under spelet står världens namn i hörnet.
+  const backLink = document.getElementById('back');
   function frame(now) {
     const dt = last ? Math.min((now - last) / 1000, 1 / 30) : 0;
     last = now;
     update(dt);
     draw();
+    const showBack = state === 'ready' && !overlay;
+    if (backLink && backLink.hidden === showBack) backLink.hidden = !showBack;
     sfx.tickMusic([world().song, world().fallback]);
     requestAnimationFrame(frame);
   }

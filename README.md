@@ -2,7 +2,7 @@
 
 Flyg genom tio världar, samla saker och blå mynt, köp nya figurer och ta dig in på topplistan.
 
-Byggt med Next.js. Första sidan är en spelväljare. Flappy Game ligger på `/flappy`, och Climbing Game, som bara har sin startskärm än så länge, på `/climbing`. Själva spelet är en canvas som ritas av `public/game.js`. Topplistan sparas i Supabase via `/api/scores`.
+Byggt med Next.js. Första sidan är en spelväljare. Flappy Game ligger på `/flappy` och Climbing Game på `/climbing`. Varje spel är en canvas som ritas av ett eget skript: `public/game.js` och `public/climbing.js`. Topplistorna sparas i Supabase via `/api/scores` och `/api/climbing/scores`.
 
 ## Köra lokalt
 
@@ -21,13 +21,15 @@ Topplistan behöver Supabase: kopiera `.env.example` till `.env.local` och fyll 
 |---|---|
 | `app/page.tsx`, `app/page.module.css` | Spelväljaren: ett kort per spel |
 | `app/flappy/page.tsx` | Flappy Game: canvasen och rutan för namn på topplistan |
-| `app/climbing/page.tsx` | Climbing Game: bara startskärmen än så länge |
+| `app/climbing/page.tsx`, `public/climbing.js` | Climbing Game: en figur klättrar uppför en tegelvägg, glider åt sidorna för att väja för det som faller och samlar saker som lyfter den. Var 40:e meter kommer en ny av 43 världar. Alla Flappy Games figurer finns som klättrare, bakifrån på väggen; figurerna och de blå mynten är desamma i båda spelen |
 | `app/layout.tsx` | Typsnitt (next/font), titel och viewport |
 | `app/globals.css` | Gemensamma färger och typsnitt, och spelets layout och stil |
 | `public/spel/` | Bilderna på korten i spelväljaren |
 | `app/api/scores/route.ts` | API för topplistan: `GET` ger de tio bästa, `POST` sparar ett resultat |
+| `app/api/player/route.ts`, `public/player.js`, `app/player-form.tsx` | Spelarens namn: väljs första gången och går aldrig att byta; topplistorna sparar under det, av sig självt |
+| `app/api/climbing/scores/route.ts` | Climbing Games topplista i meter, som `/api/scores`; ett namn hör till samma enhet i båda spelen |
 | `app/api/scores/claim/route.ts` | Kopplar ett namn från innan namnen fick ägare till enheten |
-| `lib/scores.ts` | Det API-vägarna delar: listan, enhetens nyckel |
+| `lib/scores.ts` | Det API-vägarna delar: hämta och spara en lista, enhetens nyckel |
 | `lib/supabase.ts` | Supabase-klienten |
 | `public/game.js` | Spelet |
 | `public/musik/`, `public/ljud/` | Musik och ljudeffekter (gjorda med ElevenLabs) |
