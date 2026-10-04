@@ -2831,31 +2831,35 @@
     drawCloseButton(BOARD_CLOSE);
   }
 
-  // Efter ett fall: hur högt man kom och rekordet, och platsen på topplistan om
-  // resultatet kom in där.
+  // Efter ett fall: hur högt man kom, stort, och under det rekordet, medaljen, lådan
+  // och världen. Väggen syns som vanligt bakom. Knappen tar en till startskärmen; den
+  // går att trycka på först efter en kort stund, så att ett tryck i farten inte gör det.
+  const overButton = (py, ph) => ({ x: W / 2 - 120, y: py + ph + 22, w: 240, h: 60 });
+  let OVER_BTN = overButton(140, 256);
   function drawOver() {
-    dim();
-    const pw = 260, ph = placed ? 280 : 240, px = W / 2 - pw / 2, py = 150;
-    say('Du föll!', W / 2, 122, 56, { fill: C.banana });
+    const pw = 280, ph = placed ? 290 : 256, px = W / 2 - pw / 2, py = 140;
+    OVER_BTN = overButton(py, ph);
+    say('Du föll!', W / 2, 104, 52, { fill: C.banana });
     drawPanel({ x: px, y: py, w: pw, h: ph });
-    say('HÖJD', W / 2 - 62, py + 38, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
-    say('REKORD', W / 2 + 62, py + 38, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
-    say(`${meters()} m`, W / 2 - 62, py + 84, 40, { fill: C.ink, outline: null });
-    say(`${best} m`, W / 2 + 62, py + 84, 40, { fill: C.ink, outline: null });
-    drawBoxRow(box, px + 28, py + 128, { color: C.ink, outline: null, step: 34, empty: 'Lådan är tom' });
-    const next = MEDALS[medal + 1];
-    if (medal >= 0) drawMedalLine(MEDALS[medal], W / 2, py + 166, 22, MEDALS[medal].name + '!', { fill: C.ink, outline: null });
-    else say(`${next.at} m ger en ${next.name.toLowerCase()}`, W / 2, py + 166, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+    say('DU KOM', W / 2, py + 30, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+    say(`${meters()} m`, W / 2, py + 74, 56, { fill: C.ink, outline: null });
     if (newBest) {
-      rr(W / 2 - 70, py + 189, 140, 34, 17);
+      rr(W / 2 - 70, py + 104, 140, 32, 16);
       ctx.fillStyle = C.banana; ctx.fill();
       ctx.strokeStyle = C.ink; ctx.lineWidth = 3; ctx.stroke();
-      say('Nytt rekord!', W / 2, py + 207, 18, { fill: C.ink, outline: null });
+      say('Nytt rekord!', W / 2, py + 121, 18, { fill: C.ink, outline: null });
     } else {
-      say(`Värld ${worldIndex(climbed) + 1}: ${worldAt(climbed).name}`, W / 2, py + 207, 15, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+      say(`Rekord ${best} m`, W / 2, py + 120, 16, { font: BODY, weight: '800', fill: C.dirt, outline: null });
     }
-    if (placed) say(`Plats ${placed} på topplistan!`, W / 2, py + 250, 18, { fill: C.ink, outline: null });
-    if (time - overAt > 0.6) say('Tryck för att gå till startskärmen', W / 2, py + ph + 40, 20);
+    const next = MEDALS[medal + 1];
+    if (medal >= 0) drawMedalLine(MEDALS[medal], W / 2, py + 160, 22, MEDALS[medal].name + '!', { fill: C.ink, outline: null });
+    else say(`${next.at} m ger en ${next.name.toLowerCase()}`, W / 2, py + 160, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+    drawBoxRow(box, px + 36, py + 196, { color: C.ink, outline: null, step: 34, empty: 'Lådan är tom' });
+    say(`Värld ${worldIndex(climbed) + 1}: ${worldAt(climbed).name}`, W / 2, py + 232, 15, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+    if (placed) say(`Plats ${placed} på topplistan!`, W / 2, py + 266, 18, { fill: C.ink, outline: null });
+    ctx.globalAlpha = time - overAt > 0.6 ? 1 : 0.5;
+    drawButton(OVER_BTN, 'Gå till startsidan', 24);
+    ctx.globalAlpha = 1;
   }
 
   function drawHud() {
@@ -2971,7 +2975,7 @@
 
   canvas.addEventListener('pointerdown', e => {
     e.preventDefault();
-    if (access !== 'yes' || window.player?.busy()) return;
+    if (access !== 'yes' || window.player?.busy?.()) return;
     canvas.focus({ preventScroll: true });
     startMusic();
     const p = toWorld(e);
@@ -2995,7 +2999,7 @@
     } else if (state === 'playing') {
       const r = canvas.getBoundingClientRect();
       hold(e.pointerId, e.clientX < r.left + r.width / 2 ? -1 : 1);
-    } else if (state === 'over' && time - overAt > 0.6) {
+    } else if (state === 'over' && time - overAt > 0.6 && inside(p, OVER_BTN)) {
       toStart();
     }
   });
@@ -3011,7 +3015,7 @@
   // Som i Flappy Game: F öppnar Figurer, T Topplistan, och M och N stänger av och
   // sätter på ljudeffekter och musik.
   window.addEventListener('keydown', e => {
-    if (access !== 'yes' || window.player?.busy()) return;
+    if (access !== 'yes' || window.player?.busy?.()) return;
     startMusic();
     const go = e.code === 'Space' || e.code === 'Enter';
     if (e.code === 'KeyM') { e.preventDefault(); toggleSfx(); return; }

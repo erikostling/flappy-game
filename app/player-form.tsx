@@ -6,7 +6,7 @@ import { scriptUrl } from '@/lib/scripts';
 export function PlayerForm() {
   return (
     <>
-      <form className="entry" id="player" hidden autoComplete="off">
+      <form className="entry" id="player-form" hidden autoComplete="off">
         <p className="entry-badge">Välkommen!</p>
         <h2 className="entry-title">Vad heter du?</h2>
         <label htmlFor="player-name">Ditt namn</label>

@@ -3,11 +3,11 @@
   // bytas: servern låter varje enhet ta ett enda namn (/api/player), och topplistorna
   // sparar bara under det.
   //
-  // Sidan har rutan #player, som visas tills namnet är valt. Spelen frågar
+  // Sidan har rutan #player-form, som visas tills namnet är valt. Spelen frågar
   // window.player: name() ger namnet, eller null innan det finns, och busy() är sant
   // medan rutan är öppen, så att ett tryck eller en tangent då inte startar spelet.
 
-  const form = document.getElementById('player');
+  const form = document.getElementById('player-form');
   const input = document.getElementById('player-name');
   const error = document.getElementById('player-error');
   const save = document.getElementById('player-save');

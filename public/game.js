@@ -5034,7 +5034,7 @@
   canvas.addEventListener('pointerdown', e => {
     e.preventDefault();
     // medan namnrutan är öppen startar inget
-    if (window.player?.busy()) return;
+    if (window.player?.busy?.()) return;
     canvas.focus({ preventScroll: true });
     sfx.unlock();
     const p = toWorld(e);
@@ -5063,7 +5063,7 @@
   });
 
   window.addEventListener('keydown', e => {
-    if (window.player?.busy()) return;
+    if (window.player?.busy?.()) return;
     sfx.unlock();
     if (e.code === 'KeyM') { e.preventDefault(); sfx.toggleSfx(); return; }
     if (e.code === 'KeyN') { e.preventDefault(); sfx.toggleMusic(); return; }
