@@ -10,7 +10,7 @@ const GAMES: { href: string; name: string; text: string; image: string; soon?: b
   {
     href: '/flappy',
     name: 'Flappy Game',
-    text: 'Flyg genom tio världar, samla blå mynt och köp nya figurer.',
+    text: 'Flyg genom 24 världar, samla blå mynt och köp nya figurer.',
     image: versioned('spel/flappy-game.png'),
   },
   {

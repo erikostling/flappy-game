@@ -12,8 +12,8 @@ const DESCRIPTION = [
   'Första gången väljer du en av tre startfigurer, en gång för alla.',
   'Andra figurer köper du med blå mynt under Figurer; priset står på varje låst figur, från 3 till 45 blå mynt, och hjältarna kostar 75. Bläddra mellan sidorna med pilarna längst ner eller med vänster- och högerpil.',
   'Mellan hindren kan du plocka upp en sköld som tar en krock, en magnet som drar till sig saker och slow motion.',
-  'Var 20:e poäng flyger du vidare till nästa av tio världar, med egen bakgrund, egna hinder och egen musik, och varje ny värld ger 2 blå mynt.',
-  'Från den sjätte världen blir öppningarna smalare och från den åttonde rör sig hindren.',
+  'Var 20:e poäng flyger du vidare till nästa av 24 världar, med egen bakgrund, egna hinder och egen musik, och varje ny värld ger 2 blå mynt.',
+  'Från den sjätte världen blir öppningarna smalare och från den åttonde rör sig hindren; från den tionde är det lika svårt hela vägen.',
   '10, 25 och 50 poäng i en omgång ger brons-, silver- och guldmedalj; dina medaljer visas överst i mitten av startskärmen.',
   'Knappen Spel uppe till vänster tar dig tillbaka till spelväljaren.',
   'Knapparna längst ner på startskärmen öppnar Figurer, Inställningar och Topplista; F och T fungerar också.',
@@ -23,7 +23,7 @@ const DESCRIPTION = [
 
 export const metadata: Metadata = {
   title: 'Flappy Game',
-  description: 'Flyg genom tio världar, samla saker och blå mynt, och köp nya figurer.',
+  description: 'Flyg genom 24 världar, samla saker och blå mynt, och köp nya figurer.',
 };
 
 export default function FlappyGame() {
