@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import { versioned } from '@/lib/versioned';
-import { PlayerForm } from '../player-form';
+import { Player } from '../player';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
@@ -26,12 +26,12 @@ const DESCRIPTION = [
 ].join(' ');
 
 // Hela spelet ritas på canvasen av public/runner.js, som Car Game också använder;
-// sidan ger bara canvasen och rutan där man skriver sitt namn första gången.
+// sidan ger bara canvasen, och namnet som topplistan sparar under (app/player.tsx).
 export default function ClimbingGame() {
   return (
     <main className={styles.game} id="runner-stage" data-game="climbing">
       <canvas id="runner" className={styles.canvas} tabIndex={0} aria-label={DESCRIPTION} />
-      <PlayerForm />
+      <Player />
       <a className="back" href="/" id="runner-back">← Spel</a>
       <div className={styles.safe} id="runner-safe" aria-hidden="true" />
       <Script src={versioned('runner.js')} strategy="afterInteractive" />

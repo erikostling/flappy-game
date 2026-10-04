@@ -22,9 +22,24 @@ export const viewport: Viewport = {
   themeColor: '#10291b',
 };
 
+// Namnet skrivs in först varje gång sajten öppnas i en flik (app/player.tsx). Tills
+// det är gjort visar första sidan namnsteget (klassen ask-name), och ett spel skickar
+// tillbaka dit. Det körs innan sidan ritas, så att varken spelväljaren eller spelet
+// hinner synas först; utan sessionStorage frågar ingen.
+const NAME_FIRST = `try {
+  if (sessionStorage.getItem('flappy-apa-namn-klart') !== '1') {
+    if (location.pathname === '/') document.documentElement.classList.add('ask-name');
+    else location.replace('/');
+  }
+} catch (e) {}`;
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="sv" className={`${display.variable} ${body.variable}`}>
+    // skriptet ovan lägger till en klass innan React tar över
+    <html lang="sv" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: NAME_FIRST }} />
+      </head>
       <body>{children}</body>
     </html>
   );

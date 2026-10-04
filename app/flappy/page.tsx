@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import { versioned } from '@/lib/versioned';
-import { PlayerForm } from '../player-form';
+import { Player } from '../player';
 
-// Hela spelet ritas på canvasen av public/game.js; sidan ger bara canvasen och
-// rutan där man skriver sitt namn första gången.
+// Hela spelet ritas på canvasen av public/game.js; sidan ger bara canvasen, och namnet
+// som topplistan sparar under (det skrivs in på första sidan, app/player.tsx).
 const DESCRIPTION = [
   'Flappy Game. Tryck på Starta, mellanslag eller Enter för att börja.',
   'Klicka, tryck eller använd mellanslag för att flyga genom öppningarna mellan hindren.',
@@ -31,7 +31,7 @@ export default function FlappyGame() {
     <main className="stage" id="stage">
       <div className="screen" id="screen">
         <canvas id="game" tabIndex={0} aria-label={DESCRIPTION} />
-        <PlayerForm />
+        <Player />
       </div>
       <a className="back" href="/" id="back">← Spel</a>
       <div className="safe" id="safe" aria-hidden="true" />
