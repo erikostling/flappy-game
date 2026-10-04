@@ -25,16 +25,16 @@ const DESCRIPTION = [
   'M och N stänger av och sätter på ljudeffekter och musik, i båda spelen.',
 ].join(' ');
 
-// Hela spelet ritas på canvasen av public/climbing.js; sidan ger bara canvasen och
-// rutan där man skriver sitt namn första gången.
+// Hela spelet ritas på canvasen av public/runner.js, som Car Game också använder;
+// sidan ger bara canvasen och rutan där man skriver sitt namn första gången.
 export default function ClimbingGame() {
   return (
-    <main className={styles.game} id="climb-stage">
-      <canvas id="climb" className={styles.canvas} tabIndex={0} aria-label={DESCRIPTION} />
+    <main className={styles.game} id="runner-stage" data-game="climbing">
+      <canvas id="runner" className={styles.canvas} tabIndex={0} aria-label={DESCRIPTION} />
       <PlayerForm />
-      <a className="back" href="/" id="climb-back">← Spel</a>
-      <div className={styles.safe} id="climb-safe" aria-hidden="true" />
-      <Script src={versioned('climbing.js')} strategy="afterInteractive" />
+      <a className="back" href="/" id="runner-back">← Spel</a>
+      <div className={styles.safe} id="runner-safe" aria-hidden="true" />
+      <Script src={versioned('runner.js')} strategy="afterInteractive" />
     </main>
   );
 }

@@ -2,16 +2,22 @@ import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// Det topplistornas API-vägar delar på: Flappy Games i /api/scores och Climbing
-// Games i /api/climbing/scores. Varje lista har sin tabell och sin databasfunktion
-// som sparar i den; ett namn hör till samma enhet i båda.
+// Det topplistornas API-vägar delar på: Flappy Games i /api/scores, Climbing Games i
+// /api/climbing/scores och Car Games i /api/car/scores. Varje lista har sin tabell och
+// sin databasfunktion som sparar i den; ett namn hör till samma enhet i alla. I Car
+// Game är poängen en tid, och där är lägst bäst (`ascending`).
 
 export const TOP = 10;
-const MAX_SCORE = 9999;
 
-export type Board = { table: 'scores' | 'climbing_scores'; submit: 'submit_score' | 'submit_climbing_score' };
-export const FLAPPY: Board = { table: 'scores', submit: 'submit_score' };
-export const CLIMBING: Board = { table: 'climbing_scores', submit: 'submit_climbing_score' };
+export type Board = {
+  table: 'scores' | 'climbing_scores' | 'car_scores';
+  submit: 'submit_score' | 'submit_climbing_score' | 'submit_car_score';
+  max: number;
+  ascending?: boolean;
+};
+export const FLAPPY: Board = { table: 'scores', submit: 'submit_score', max: 9999 };
+export const CLIMBING: Board = { table: 'climbing_scores', submit: 'submit_climbing_score', max: 9999 };
+export const CAR: Board = { table: 'car_scores', submit: 'submit_car_score', max: 999999, ascending: true };
 
 export type Db = NonNullable<ReturnType<typeof supabase>>;
 type Row = { name: string; score: number; figure: string; created_at: string };
@@ -32,13 +38,13 @@ export async function board(db: Db, hash: string | null, list: Board = FLAPPY) {
   const top = await db
     .from(list.table)
     .select('name, score, figure, created_at')
-    .order('score', { ascending: false })
+    .order('score', { ascending: !!list.ascending })
     .order('created_at', { ascending: true })
     .limit(TOP);
   if (top.error) throw top.error;
   const entries = (top.data as Row[]).map(r => ({ name: r.name, score: r.score, figure: r.figure, at: r.created_at }));
   if (!hash) return { entries, mine: [] };
-  const own = await Promise.all([FLAPPY, CLIMBING].map(l => db.from(l.table).select('name_key').eq('owner', hash)));
+  const own = await Promise.all([FLAPPY, CLIMBING, CAR].map(l => db.from(l.table).select('name_key').eq('owner', hash)));
   const failed = own.find(r => r.error);
   if (failed?.error) throw failed.error;
   const mine = new Set(own.flatMap(r => (r.data as { name_key: string }[]).map(row => row.name_key)));
@@ -86,7 +92,7 @@ export async function postScore(request: Request, list: Board) {
   const score = Number(body?.score);
   const figure = typeof body?.figure === 'string' && /^[a-z]{1,20}$/.test(body.figure) ? body.figure : 'apa';
   const hash = playerHash(request);
-  if (!hash || !name || !Number.isInteger(score) || score < 1 || score > MAX_SCORE) {
+  if (!hash || !name || !Number.isInteger(score) || score < 1 || score > list.max) {
     return json({ error: 'invalid' }, 400);
   }
 

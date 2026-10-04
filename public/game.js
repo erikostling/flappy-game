@@ -4633,7 +4633,7 @@
   const levelBadge = () => ({ x: UI_R - 14 - 120, y: UI_T + 14, w: 120, h: 44 });
   // medaljerna i mitten, så att knappen tillbaka till spelväljaren får hörnet; båda
   // brickorna är smala nog att få plats bredvid den på en mobil
-  const medalBadge = () => ({ x: W / 2 - 58, y: UI_T + 14, w: 116, h: 44 });
+  const medalBadge = () => ({ x: W / 2 - 62, y: UI_T + 14, w: 124, h: 44 });
 
   function drawGear(cx, cy) {
     ctx.save();
@@ -4687,11 +4687,12 @@
     const b = medalBadge();
     drawButtonFrame(b, false);
     MEDALS.forEach((m, i) => {
-      const x = b.x + 16 + i * 34;
+      // plats för tvåsiffriga antal innan nästa medalj
+      const x = b.x + 15 + i * 38;
       ctx.globalAlpha = medalCount[i] ? 1 : 0.35;
-      drawMedal(m, x, b.y + 25, 9);
+      drawMedal(m, x, b.y + 25, 8);
       ctx.globalAlpha = 1;
-      say(String(medalCount[i]), x + 12, b.y + 25, 15, { font: BODY, weight: '800', fill: C.ink, stroke: null, align: 'left' });
+      say(String(medalCount[i]), x + 11, b.y + 25, 14, { font: BODY, weight: '800', fill: C.ink, stroke: null, align: 'left' });
     });
   }
 
