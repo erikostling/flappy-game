@@ -1,4 +1,5 @@
-/* Spelväljaren: kort i ett rutnät som centreras, i samma färger och typsnitt som spelen. */
+/* Spelväljaren: korten i ett rutnät med två i bredd, i samma färger och typsnitt som
+   spelen. På en mobil blir korten mindre, men det är fortfarande två i bredd. */
 .page {
   min-height: 100dvh;
   box-sizing: border-box;
@@ -24,19 +25,22 @@
   margin: 0;
   padding: 0;
   width: 100%;
-  max-width: 980px;
+  max-width: 640px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 300px));
+  grid-template-columns: repeat(2, minmax(0, 300px));
   justify-content: center;
-  gap: 24px;
+  gap: clamp(12px, 3vw, 24px);
 }
+/* korten på en rad blir lika höga */
+.games > li { display: flex; }
 
 .card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 14px 14px 20px;
+  flex: 1;
+  gap: clamp(4px, 1.4vw, 8px);
+  padding: clamp(8px, 2.4vw, 14px) clamp(8px, 2.4vw, 14px) clamp(12px, 3vw, 20px);
   background: var(--panel);
   color: var(--ink);
   border: 4px solid var(--ink);
@@ -61,29 +65,48 @@
 .name {
   margin-top: 4px;
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: clamp(18px, 5vw, 30px);
+  text-align: center;
 }
 
 .text {
   font-weight: 800;
-  font-size: 15px;
+  font-size: clamp(11px, 3.1vw, 15px);
   line-height: 1.35;
   color: var(--dirt);
   text-align: center;
 }
 
 .play {
-  margin-top: 6px;
-  padding: 10px 36px;
+  margin-top: auto;
+  white-space: nowrap;
+  padding: clamp(6px, 1.8vw, 10px) clamp(16px, 6vw, 36px);
   background: var(--banana);
   border: 3px solid var(--ink);
   border-radius: 999px;
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: clamp(15px, 4vw, 22px);
 }
 
 .soon {
   background: #f3e6c2;
+  color: var(--dirt);
+}
+
+/* En plats där ett spel saknas än: ett frågetecken i stället för bild, och ingen länk. */
+.empty { opacity: .85; }
+.empty:hover, .empty:active { transform: none; }
+.mystery {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border: 3px dashed var(--dirt);
+  border-radius: 14px;
+  background: #f3e6c2;
+  font-family: var(--font-display);
+  font-size: clamp(56px, 18vw, 120px);
   color: var(--dirt);
 }
 
