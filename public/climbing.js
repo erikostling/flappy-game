@@ -2848,14 +2848,17 @@
   }
 
   // Efter ett fall: hur högt man kom, stort, och under det rekordet, medaljen, lådan
-  // och världen. Väggen syns som vanligt bakom. Knappen tar en till startskärmen; den
-  // går att trycka på först efter en kort stund, så att ett tryck i farten inte gör det.
-  const overButton = (py, ph) => ({ x: W / 2 - 120, y: py + ph + 22, w: 240, h: 60 });
-  let OVER_BTN = overButton(140, 256);
+  // och världen. Väggen syns som vanligt bakom. Gå till startsidan tar en till
+  // startskärmen och Spela igen startar en ny runda direkt. Knapparna går att trycka på
+  // först efter en kort stund, så att ett tryck i farten inte gör det.
+  const overButton = (py, ph) => ({ x: W / 2 - 120, y: py + ph + 18, w: 240, h: 56 });
+  const againButton = b => ({ x: b.x, y: b.y + b.h + 12, w: b.w, h: b.h });
+  let OVER_BTN = overButton(130, 256), AGAIN_BTN = againButton(OVER_BTN);
   function drawOver() {
-    const pw = 280, ph = placed ? 290 : 256, px = W / 2 - pw / 2, py = 140;
+    const pw = 280, ph = placed ? 290 : 256, px = W / 2 - pw / 2, py = 130;
     OVER_BTN = overButton(py, ph);
-    say('Du föll!', W / 2, 104, 52, { fill: C.banana });
+    AGAIN_BTN = againButton(OVER_BTN);
+    say('Du föll!', W / 2, 94, 52, { fill: C.banana });
     drawPanel({ x: px, y: py, w: pw, h: ph });
     say('DU KOM', W / 2, py + 30, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
     say(`${meters()} m`, W / 2, py + 74, 56, { fill: C.ink, outline: null });
@@ -2875,6 +2878,7 @@
     if (placed) say(`Plats ${placed} på topplistan!`, W / 2, py + 266, 18, { fill: C.ink, outline: null });
     ctx.globalAlpha = time - overAt > 0.6 ? 1 : 0.5;
     drawButton(OVER_BTN, 'Gå till startsidan', 24);
+    drawButton(AGAIN_BTN, 'Spela igen', 24);
     ctx.globalAlpha = 1;
   }
 
@@ -3018,8 +3022,9 @@
       drags.set(e.pointerId, { startX: e.clientX, swiping: false });
       // fingret fortsätter att styra också om det glider över länken eller utanför
       try { canvas.setPointerCapture(e.pointerId); } catch {}
-    } else if (state === 'over' && time - overAt > 0.6 && inside(p, OVER_BTN)) {
-      toStart();
+    } else if (state === 'over' && time - overAt > 0.6) {
+      if (inside(p, OVER_BTN)) toStart();
+      else if (inside(p, AGAIN_BTN)) reset();
     }
   });
 

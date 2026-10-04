@@ -16,7 +16,7 @@ const DESCRIPTION = [
   'Samla mynt, bananer, paket, stjärnor och diamanter på väggen; de lyfter dig fler meter. Blå mynt köper figurer i Flappy Game.',
   'Ibland sitter en kraft på väggen i stället: en sköld som tar en träff, en magnet som drar sakerna till dig och slow motion som saktar ner det som faller.',
   'Väj för blomkrukor och tegelstenar som faller; träffas figuren faller den ner.',
-  'Poängen är hur många meter du har klättrat. När du har fallit visas hur högt du kom och ditt rekord, och knappen Gå till startsidan tar dig tillbaka.',
+  'Poängen är hur många meter du har klättrat. När du har fallit visas hur högt du kom och ditt rekord, knappen Gå till startsidan tar dig tillbaka och Spela igen startar en ny runda.',
   'Var 40:e meter klättrar du in i en ny av 43 världar, med en egen vägg och egna saker som faller, och varje ny värld ger 2 blå mynt.',
   'Första gången skriver du ditt namn; det går inte att byta sen. Kommer du in på topplistan sparas du där med det.',
   '35, 70 och 120 meter i en runda ger brons-, silver- och guldmedalj; dina medaljer visas överst på startskärmen.',
