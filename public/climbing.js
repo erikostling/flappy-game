@@ -212,8 +212,8 @@
   // ---------- Sakerna ----------
 
   // Saker att samla, som i Flappy Game. De sitter på väggen i spåren, och man tar dem
-  // genom att klättra förbi i rätt spår. Värdet är meter som figuren lyfts uppåt, så
-  // att poängen fortfarande är höjden. Blå mynt ger inga meter; de är Flappy Games och
+  // genom att klättra förbi. Värdet läggs till höjden som meter, utan att figuren
+  // flyttas, och "+10" syns en stund. Blå mynt ger inga meter; de är Flappy Games och
   // köper figurer där. Vikterna summerar till 100 och styr hur vanlig varje sak är.
   const ITEMS = [
     { id: 'mynt', name: 'Mynt', value: 1, weight: 36, draw: drawCoin },
@@ -257,16 +257,15 @@
 
   // ---------- Spelet ----------
 
-  // ready (startskärmen) → playing → falling → over: rutan med höjden och rekordet.
-  // Ett tryck var som helst där går tillbaka till startskärmen. Kom man in på
-  // topplistan frågar namnrutan efter namnet först.
+  // ready (startskärmen) → playing → falling → over: rutan med höjden och rekordet,
+  // med knapparna Gå till startsidan och Spela igen.
   let state = 'ready';
   let time = 0, overAt = 0, climbed = 0, nextSpawnAt = 0, nextMilestone = 10;
   let playerX = W / 2, playerY = PLAYER_Y, fallVy = 0, fallSpin = 0;
   let falling = [], popups = [], startedAt = 0;
-  // sakerna på väggen, vad som har hamnat i lådan den här rundan, och meter som en
-  // sak har gett men som figuren inte har klättrat än
-  let items = [], box = ITEMS.map(() => 0), nextItemAt = 0, boost = 0;
+  // sakerna på väggen, vad som har hamnat i lådan den här rundan, och metrarna som
+  // sakerna har gett
+  let items = [], box = ITEMS.map(() => 0), nextItemAt = 0, bonus = 0;
   // världen figuren har klättrat in i den här rundan, och när den kom dit
   let worldStep = 0, worldShownAt = -10;
   // krafterna på väggen och de som verkar just nu; `safeUntil` är när figuren slutar
@@ -280,7 +279,8 @@
   // raden man sparade på topplistan, och vilken plats den fick den här rundan
   let savedEntry = null, placed = 0;
 
-  const meters = () => Math.floor(climbed / METER);
+  // höjden: det man har klättrat och det sakerna har gett
+  const meters = () => Math.floor(climbed / METER) + bonus;
   // Fortare ju högre man kommer: från 2 till 5,5 meter i sekunden.
   const climbSpeed = () => 80 + Math.min(140, climbed / 40);
   // Kortare mellan sakerna som faller ju högre man kommer.
@@ -291,7 +291,7 @@
     playerX = W / 2; playerY = PLAYER_Y; fallVy = 0; fallSpin = 0;
     falling = []; popups = []; newBest = false; placed = 0; startedAt = time;
     medal = -1; medalShownAt = -10;
-    items = []; box = ITEMS.map(() => 0); nextItemAt = 120; boost = 0;
+    items = []; box = ITEMS.map(() => 0); nextItemAt = 120; bonus = 0;
     worldStep = 0; worldShownAt = -10;
     powers = []; shield = false; magnetUntil = slowUntil = safeUntil = 0; flash = 0;
     holds.clear(); drags.clear(); swipeTarget = null;
@@ -301,13 +301,13 @@
   // tryck flyttar den genast en liten bit, så att också ett kort tryck märks.
   // `holds` är fingrar och tangenter som håller just nu, med sitt håll.
   //
-  // Sveper fingret åt sidan i stället följer figuren med, lite långsammare än fingret:
-  // den ska till en punkt en bit kortare bort (SWIPE_FOLLOW) och glider dit mjukt
+  // Sveper fingret åt sidan i stället följer figuren med, långsammare än fingret: den
+  // ska halvvägs så långt som fingret har svept (SWIPE_FOLLOW) och glider dit mjukt
   // (SWIPE_EASE). `drags` är fingrarna som ligger mot skärmen: var de började, och från
   // var de styr figuren när de har börjat svepa. `swipeTarget` är dit figuren glider.
   const holds = new Map(), drags = new Map();
   const SWIPE = 6; // så många pixlar fingret ska röra sig innan det räknas som ett svep
-  const SWIPE_FOLLOW = 0.7, SWIPE_EASE = 8;
+  const SWIPE_FOLLOW = 0.5, SWIPE_EASE = 5;
   let swipeTarget = null;
   const steering = () => { let d = 0; for (const dir of holds.values()) d += dir; return Math.sign(d); };
   const clampX = x => Math.max(MIN_X, Math.min(MAX_X, x));
@@ -399,8 +399,8 @@
       play('collect', 0.6, 1.3);
       return;
     }
-    boost += item.value * METER;
-    popups.push({ text: `+${item.value} m`, at: time, x, y: playerY - 50 });
+    bonus += item.value;
+    popups.push({ text: `+${item.value}`, at: time, x, y: playerY - 50, life: 2, size: 30 });
     play('collect', 0.6, 1 + item.value * 0.04);
   }
 
@@ -424,10 +424,7 @@
       // slow motion saktar ner väggen och det som faller, men inte fingret som styr
       const t = time < slowUntil ? dt * SLOW : dt;
       const v = climbSpeed();
-      // metrarna från en sak klättras på en kort stund, så att väggen rusar förbi
-      const lift = Math.min(boost, Math.max(300, boost * 5) * t);
-      boost -= lift;
-      climbed += v * t + lift;
+      climbed += v * t;
       playerX = clampX(playerX + steering() * STEER * dt);
       if (swipeTarget !== null) {
         playerX += (swipeTarget - playerX) * Math.min(1, dt * SWIPE_EASE);
@@ -442,18 +439,18 @@
       }
       const near = it => Math.abs(it.x - playerX) < 26 && Math.abs(it.y - (playerY - 8)) < 26;
       for (const it of items) {
-        it.y += v * t + lift;
+        it.y += v * t;
         pull(it, dt);
         if (near(it)) collect(it);
       }
       items = items.filter(it => !it.taken && it.y < VY1 + 40);
       for (const it of powers) {
-        it.y += v * t + lift;
+        it.y += v * t;
         if (near(it)) takePower(it);
       }
       powers = powers.filter(it => !it.taken && it.y < VY1 + 40);
       for (const f of falling) {
-        f.y += (FALL + v) * t + lift;
+        f.y += (FALL + v) * t;
         f.spin += t * 4;
         const dx = f.x - playerX, dy = f.y - (playerY - 4);
         if (dx * dx + dy * dy < (HIT + 13) ** 2 && !survives()) { crash(); break; }
@@ -476,7 +473,7 @@
       for (const f of falling) f.y += FALL * dt;
       if (playerY > VY1 + 80) landed();
     }
-    popups = popups.filter(p => time - p.at < 1.2);
+    popups = popups.filter(p => time - p.at < (p.life ?? 1.2));
   }
 
   // ---------- Topplistan efter ett fall ----------
@@ -2910,9 +2907,10 @@
       ctx.globalAlpha = 1;
     }
     for (const p of popups) {
-      const k = (time - p.at) / 1.2;
-      ctx.globalAlpha = 1 - k;
-      say(p.text, p.x ?? playerX, (p.y ?? PLAYER_Y - 70) - k * 40, p.size ?? 24, { fill: p.color ?? C.banana });
+      const k = (time - p.at) / (p.life ?? 1.2);
+      ctx.globalAlpha = 1 - k * k;
+      // "10 m!" och de andra utan egen plats står högre än "+10" från en sak
+      say(p.text, p.x ?? playerX, (p.y ?? PLAYER_Y - 105) - k * 40, p.size ?? 24, { fill: p.color ?? C.banana });
     }
     ctx.globalAlpha = 1;
     drawBoxRow(box, 30, UI_B - 24, { empty: 'Samla saker i lådan!' });
