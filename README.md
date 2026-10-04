@@ -1,6 +1,6 @@
 # Flappy Game
 
-Flyg genom tio världar, samla saker och blå mynt, köp nya figurer och ta dig in på topplistan.
+Flyg genom 24 världar, samla saker och blå mynt, köp nya figurer och ta dig in på topplistan.
 
 Byggt med Next.js. Första sidan är en spelväljare. Flappy Game ligger på `/flappy` och Climbing Game på `/climbing`. Varje spel är en canvas som ritas av ett eget skript: `public/game.js` och `public/climbing.js`. Topplistorna sparas i Supabase via `/api/scores` och `/api/climbing/scores`.
 

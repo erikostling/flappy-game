@@ -642,9 +642,9 @@
   }
 
   const REDUCE_MOTION = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
-  // Tio världar i tur och ordning, var och en med sin bakgrund, sina hinder och sin
+  // 24 världar i tur och ordning, var och en med sin bakgrund, sina hinder och sin
   // musik. Omgången börjar i den första och var 20:e poäng flyger man vidare till
-  // nästa; efter den tionde börjar det om. `fallback` spelas om världens egen låt
+  // nästa; efter den sista börjar det om. `fallback` spelas om världens egen låt
   // inte går att hämta.
   const WORLDS = [
     { name: 'Djungeln', theme: 'apa', obstacle: 'stockar', song: 'djungel', fallback: 'glad' },
@@ -657,6 +657,20 @@
     { name: 'Fabriken', theme: 'robot', obstacle: 'ror', song: 'rymd' },
     { name: 'Spöknatten', theme: 'spoke', obstacle: 'lyktor', song: 'spok' },
     { name: 'Regnbågslandet', theme: 'enhorning', obstacle: 'tartor', song: 'regnbage', fallback: 'glad' },
+    { name: 'Rymden', theme: 'astronaut', obstacle: 'ror', song: 'rymd' },
+    { name: 'Urtiden', theme: 'dinosaurie', obstacle: 'stockar', song: 'djungel', fallback: 'glad' },
+    { name: 'Havet', theme: 'blackfisk', obstacle: 'pelare', song: 'strand', fallback: 'lugn' },
+    { name: 'Staden', theme: 'katt', obstacle: 'lyktor', song: 'glad' },
+    { name: 'Regndammen', theme: 'groda', obstacle: 'svampar', song: 'lugn' },
+    { name: 'Påskängen', theme: 'paskhare', obstacle: 'pennor', song: 'glad' },
+    { name: 'Julnatten', theme: 'tomte', obstacle: 'istappar', song: 'jul' },
+    { name: 'Höstfältet', theme: 'pumpa', obstacle: 'stockar', song: 'lugn' },
+    { name: 'Storstaden', theme: 'superhjalte', obstacle: 'klossar', song: 'rymd' },
+    { name: 'Bambuskogen', theme: 'panda', obstacle: 'sugror', song: 'djungel', fallback: 'lugn' },
+    { name: 'Nattskogen', theme: 'uggla', obstacle: 'lyktor', song: 'spok' },
+    { name: 'Savannen', theme: 'lejon', obstacle: 'pelare', song: 'oken', fallback: 'glad' },
+    { name: 'Bondgården', theme: 'ko', obstacle: 'isglass', song: 'glad' },
+    { name: 'Den främmande planeten', theme: 'alien', obstacle: 'ror', song: 'rymd' },
   ];
   const WORLD_EVERY = 20;
   let worldStep = 0, nextWorldAt = WORLD_EVERY, worldShownAt = -10;
@@ -668,10 +682,12 @@
   const currentObstacle = () => OBSTACLES.findIndex(o => o.id === world().obstacle);
   // Svårare mot slutet: från den sjätte världen krymper öppningen 5 för varje värld,
   // och från den åttonde glider hindren upp och ner, längre för varje värld: 30, 38
-  // och 46 åt varje håll, ett varv på drygt 3 sekunder, så att det syns direkt.
-  const gapSize = () => GAP - 5 * Math.max(0, worldStep - 4);
-  const glideSize = () => (worldStep >= 7 ? 30 + 8 * (worldStep - 7) : 0);
-  const GLIDE_SPEED = 2.0, WORLD_BONUS = 2;
+  // och 46 åt varje håll, ett varv på drygt 3 sekunder, så att det syns direkt. Från
+  // den tionde är det lika svårt hela vägen; världarna efter den är bara nya världar.
+  const hardStep = () => Math.min(worldStep, HARDEST);
+  const gapSize = () => GAP - 5 * Math.max(0, hardStep() - 4);
+  const glideSize = () => (hardStep() >= 7 ? 30 + 8 * (hardStep() - 7) : 0);
+  const GLIDE_SPEED = 2.0, WORLD_BONUS = 2, HARDEST = 9;
   // Det som blir nytt i en värld visas under dess namn när man flyger in.
   const worldNews = () => (worldStep === 5 ? 'Öppningarna blir smalare!' : worldStep === 7 ? 'Nu rör sig hindren!' : '');
 
