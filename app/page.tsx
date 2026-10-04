@@ -2,8 +2,8 @@ import styles from './page.module.css';
 
 // Första sidan: spelen att välja mellan. Varje spel är en egen sida. Länken laddar
 // spelets sida på nytt, så att ett spel börjar från början varje gång och slutar
-// spela musik när man går därifrån. Ett spel som inte är byggt än (`soon`) har bara
-// sin startskärm, och kortet säger att det kommer snart.
+// spela musik när man går därifrån. Ett spel som inte är byggt än (`soon`) får ett
+// kort som säger att det kommer snart.
 const GAMES: { href: string; name: string; text: string; image: string; soon?: boolean }[] = [
   {
     href: '/flappy',
@@ -16,7 +16,6 @@ const GAMES: { href: string; name: string; text: string; image: string; soon?: b
     name: 'Climbing Game',
     text: 'Klättra uppför tegelväggen så högt du kan.',
     image: '/spel/climbing-game.png',
-    soon: true,
   },
 ];
 

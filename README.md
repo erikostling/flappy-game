@@ -2,7 +2,7 @@
 
 Flyg genom tio världar, samla saker och blå mynt, köp nya figurer och ta dig in på topplistan.
 
-Byggt med Next.js. Första sidan är en spelväljare. Flappy Game ligger på `/flappy`, och Climbing Game, som bara har sin startskärm än så länge, på `/climbing`. Själva spelet är en canvas som ritas av `public/game.js`. Topplistan sparas i Supabase via `/api/scores`.
+Byggt med Next.js. Första sidan är en spelväljare. Flappy Game ligger på `/flappy` och Climbing Game på `/climbing`. Varje spel är en canvas som ritas av ett eget skript: `public/game.js` och `public/climbing.js`. Topplistan sparas i Supabase via `/api/scores`.
 
 ## Köra lokalt
 
@@ -21,7 +21,7 @@ Topplistan behöver Supabase: kopiera `.env.example` till `.env.local` och fyll 
 |---|---|
 | `app/page.tsx`, `app/page.module.css` | Spelväljaren: ett kort per spel |
 | `app/flappy/page.tsx` | Flappy Game: canvasen och rutan för namn på topplistan |
-| `app/climbing/page.tsx` | Climbing Game: bara startskärmen än så länge |
+| `app/climbing/page.tsx`, `public/climbing.js` | Climbing Game: apan klättrar uppför en tegelvägg och väjer för det som faller; rekordet sparas på enheten |
 | `app/layout.tsx` | Typsnitt (next/font), titel och viewport |
 | `app/globals.css` | Gemensamma färger och typsnitt, och spelets layout och stil |
 | `public/spel/` | Bilderna på korten i spelväljaren |
