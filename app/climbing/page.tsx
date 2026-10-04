@@ -19,12 +19,13 @@ const GAME_VERSION = createHash('sha256')
 const DESCRIPTION = [
   'Climbing Game. Tryck på Starta, mellanslag eller Enter för att börja.',
   'Figuren klättrar uppför en tegelvägg av sig själv.',
-  'Tryck på vänster eller höger halva av skärmen, eller använd pil- eller A- och D-tangenterna, för att flytta mellan tre spår.',
+  'Håll på vänster eller höger halva av skärmen, eller håll inne pil- eller A- och D-tangenterna, för att flytta dig åt sidan.',
+  'Samla mynt, bananer, paket, stjärnor och diamanter på väggen; de lyfter dig fler meter. Blå mynt köper figurer i Flappy Game.',
   'Väj för blomkrukor och tegelstenar som faller; träffas figuren faller den ner.',
   'Poängen är hur många meter du har klättrat. När du har fallit visas höjden och ditt rekord, och ett tryck tar dig tillbaka till startskärmen.',
   'Kommer du in på topplistan skriver du ditt namn där.',
   'Knapparna längst ner på startskärmen öppnar Figurer, Inställningar och Topplista; F och T fungerar också.',
-  'Under Figurer väljer du vem som klättrar, bland figurerna du har i Flappy Game.',
+  'Under Figurer väljer du vem som klättrar. Låsta figurer köper du där med blå mynt, till samma pris som i Flappy Game; priset står i hörnet. Figurerna och mynten är desamma i båda spelen.',
   'M och N stänger av och sätter på ljudeffekter och musik, i båda spelen.',
 ].join(' ');
 
@@ -45,7 +46,7 @@ export default function ClimbingGame() {
           <button type="button" className="secondary" id="climb-entry-skip">Hoppa över</button>
         </div>
       </form>
-      <a className={styles.back} href="/">← Spel</a>
+      <a className={styles.back} href="/" id="climb-back">← Spel</a>
       <div className={styles.safe} id="climb-safe" aria-hidden="true" />
       <Script src={`/climbing.js?v=${GAME_VERSION}`} strategy="afterInteractive" />
     </main>
