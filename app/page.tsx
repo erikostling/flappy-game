@@ -19,6 +19,12 @@ const GAMES: { href: string; name: string; text: string; image: string; soon?: b
     text: 'Klättra uppför tegelväggen så högt du kan.',
     image: versioned('spel/climbing-game.png'),
   },
+  {
+    href: '/car',
+    name: 'Car Game',
+    text: 'Kör så långt du kan utan att krocka.',
+    image: versioned('spel/car-game.png'),
+  },
 ];
 
 export default function Home() {

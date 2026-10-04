@@ -2,7 +2,7 @@
 
 Flyg genom 24 världar, samla saker och blå mynt, köp nya figurer och ta dig in på topplistan.
 
-Byggt med Next.js. Första sidan är en spelväljare. Flappy Game ligger på `/flappy` och Climbing Game på `/climbing`. Varje spel är en canvas som ritas av ett eget skript: `public/game.js` och `public/climbing.js`. Topplistorna sparas i Supabase via `/api/scores` och `/api/climbing/scores`.
+Byggt med Next.js. Första sidan är en spelväljare. Flappy Game ligger på `/flappy`, Climbing Game på `/climbing` och Car Game på `/car`. Varje spel är en canvas som ritas av ett eget skript: `public/game.js`, `public/climbing.js` och `public/car.js`. Topplistorna sparas i Supabase via `/api/scores` och `/api/climbing/scores`.
 
 ## Köra lokalt
 
@@ -22,6 +22,7 @@ Topplistan behöver Supabase: kopiera `.env.example` till `.env.local` och fyll 
 | `app/page.tsx`, `app/page.module.css` | Spelväljaren: ett kort per spel |
 | `app/flappy/page.tsx` | Flappy Game: canvasen och rutan för namn på topplistan |
 | `app/climbing/page.tsx`, `public/climbing.js` | Climbing Game: en figur klättrar uppför en tegelvägg, glider åt sidorna för att väja för det som faller och samlar saker som lyfter den. Var 40:e meter kommer en ny av 43 världar. Alla Flappy Games figurer finns som klättrare, bakifrån på väggen; figurerna och de blå mynten är desamma i båda spelen |
+| `app/car/page.tsx`, `public/car.js` | Car Game: apan kör en röd F1-bil uppför vägen och kör om bilarna framför utan att krocka; blå mynt går till kassan som spelen delar |
 | `app/layout.tsx` | Typsnitt (next/font), titel och viewport |
 | `app/globals.css` | Gemensamma färger och typsnitt, och spelets layout och stil |
 | `public/spel/` | Bilderna på korten i spelväljaren |

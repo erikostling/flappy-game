@@ -1,0 +1,26 @@
+/* Car Game: canvasen över hela skärmen. Gräset bakom syns tills spelet har laddat,
+   så att sidan inte blinkar i en annan färg. */
+.game {
+  position: fixed;
+  inset: 0;
+  background: #5cb83a;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  /* svepen styr bilen; webbläsaren ska inte panorera eller zooma på dem */
+  touch-action: none;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Läses av spelet: hur mycket notch och hemknapp tar från skärmens kanter. */
+.safe {
+  position: fixed;
+  inset: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  visibility: hidden;
+  pointer-events: none;
+}
