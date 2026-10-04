@@ -2,7 +2,7 @@
 
 Flyg genom tio världar, samla saker och blå mynt, köp nya figurer och ta dig in på topplistan.
 
-Byggt med Next.js. Första sidan är en spelväljare. Flappy Game ligger på `/flappy` och Climbing Game på `/climbing`. Varje spel är en canvas som ritas av ett eget skript: `public/game.js` och `public/climbing.js`. Topplistan sparas i Supabase via `/api/scores`.
+Byggt med Next.js. Första sidan är en spelväljare. Flappy Game ligger på `/flappy` och Climbing Game på `/climbing`. Varje spel är en canvas som ritas av ett eget skript: `public/game.js` och `public/climbing.js`. Topplistorna sparas i Supabase via `/api/scores` och `/api/climbing/scores`.
 
 ## Köra lokalt
 
@@ -26,8 +26,9 @@ Topplistan behöver Supabase: kopiera `.env.example` till `.env.local` och fyll 
 | `app/globals.css` | Gemensamma färger och typsnitt, och spelets layout och stil |
 | `public/spel/` | Bilderna på korten i spelväljaren |
 | `app/api/scores/route.ts` | API för topplistan: `GET` ger de tio bästa, `POST` sparar ett resultat |
+| `app/api/climbing/scores/route.ts` | Climbing Games topplista i meter, som `/api/scores`; ett namn hör till samma enhet i båda spelen |
 | `app/api/scores/claim/route.ts` | Kopplar ett namn från innan namnen fick ägare till enheten |
-| `lib/scores.ts` | Det API-vägarna delar: listan, enhetens nyckel |
+| `lib/scores.ts` | Det API-vägarna delar: hämta och spara en lista, enhetens nyckel |
 | `lib/supabase.ts` | Supabase-klienten |
 | `public/game.js` | Spelet |
 | `public/musik/`, `public/ljud/` | Musik och ljudeffekter (gjorda med ElevenLabs) |
