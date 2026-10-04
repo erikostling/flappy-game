@@ -132,6 +132,33 @@
     if (document.hidden) ac.suspend().catch(() => {});
     else ac.resume().catch(() => {});
   });
+  // Motorljudet i Car Game: två brummande toner genom ett filter, som går upp i ton med
+  // farten, hörs mer när man gasar och varvar upp i ett hopp och när man gasar på
+  // startlinjen. Det byggs vid första trycket, som musiken, och tystnar med
+  // ljudeffekterna (M) och utanför racet.
+  let engine = null;
+  function startEngine() {
+    if (!CAR || engine || document.hidden) return;
+    try { ac ??= new AudioContext(); } catch { return; }
+    ac.resume().catch(() => {});
+    const low = ac.createOscillator(), high = ac.createOscillator(), filter = ac.createBiquadFilter(), gain = ac.createGain();
+    low.type = 'sawtooth'; high.type = 'square';
+    filter.type = 'lowpass'; filter.Q.value = 4;
+    gain.gain.value = 0;
+    low.connect(filter); high.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+    low.start(); high.start();
+    engine = { low, high, filter, gain };
+  }
+  function stepEngine() {
+    if (!engine) return;
+    const racing = sfxOn && state === 'playing' && !overlay;
+    const rev = (time < startedAt ? (gas() ? 0.35 : 0) : carSpeed / ROAD_SPEED) * (air ? 1.25 : 1);
+    const hz = 42 + 110 * rev, t = ac.currentTime;
+    engine.low.frequency.setTargetAtTime(hz, t, 0.06);
+    engine.high.frequency.setTargetAtTime(hz * 2.02, t, 0.06);
+    engine.filter.frequency.setTargetAtTime(300 + 900 * rev, t, 0.06);
+    engine.gain.gain.setTargetAtTime(racing ? 0.03 + (gas() ? 0.03 : 0) + 0.05 * rev : 0, t, 0.1);
+  }
   function toggleSfx() {
     sfxOn = !sfxOn;
     store('flappy-apa-ljud', sfxOn ? 'på' : 'av');
@@ -3102,6 +3129,28 @@
     }
   }
 
+  // Hastighetsmätaren nere till höger: en visare över en båge från stilla till full fart,
+  // grön, gul och sedan röd, och farten i km/h, där full fart på banan är 300.
+  const KMH = 300 / ROAD_SPEED;
+  function drawSpeedometer() {
+    const r = 40, x = VX1 - 18 - r, y = UI_B - 18 - r;
+    const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25, k = Math.min(1, carSpeed / ROAD_SPEED), a = a0 + (a1 - a0) * k;
+    blob(x, y, r, 'rgba(255,247,224,0.92)');
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineCap = 'round'; ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.beginPath(); ctx.arc(x, y, r - 9, a0, a1); ctx.stroke();
+    if (k > 0.01) {
+      ctx.strokeStyle = k < 0.6 ? '#2bb673' : k < 0.85 ? '#ffb000' : '#e63946';
+      ctx.beginPath(); ctx.arc(x, y, r - 9, a0, a); ctx.stroke();
+    }
+    stroke([[x, y], [x + Math.cos(a) * (r - 13), y + Math.sin(a) * (r - 13)]], C.ink, 3);
+    blob(x, y, 4, C.ink);
+    say(String(Math.round(carSpeed * KMH)), x, y + 17, 15, { fill: C.ink, outline: null });
+    say('km/h', x, y + 29, 9, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+  }
+
   // Kartan uppe till höger: hela slingan, mållinjen och en prick där bilen är.
   function drawMinimap() {
     const b = { x: VX1 - 14 - 110, y: UI_T + 14, w: 110, h: 80 };
@@ -3547,6 +3596,7 @@
     if (best || !CAR) say(`Rekord ${formatScore(best)}`, W / 2, UI_T + 80, 14, { font: BODY, weight: '800' });
     if (CAR) {
       drawMinimap();
+      drawSpeedometer();
       say(`Plats ${racePlace()} av ${rivals.length + 1}`, W / 2, UI_T + (best ? 100 : 80), 15, { font: BODY, weight: '800', fill: C.banana });
       const left = startedAt - time;
       if (left > -0.6) {
@@ -3675,7 +3725,7 @@
     e.preventDefault();
     if (access !== 'yes' || window.player?.busy?.()) return;
     canvas.focus({ preventScroll: true });
-    startMusic();
+    startMusic(); startEngine();
     const p = toWorld(e);
     if (overlay === 'figures') {
       const i = figureAt(p);
@@ -3721,7 +3771,7 @@
   // sätter på ljudeffekter och musik.
   window.addEventListener('keydown', e => {
     if (access !== 'yes' || window.player?.busy?.()) return;
-    startMusic();
+    startMusic(); startEngine();
     const go = e.code === 'Space' || e.code === 'Enter';
     if (e.code === 'KeyM') { e.preventDefault(); toggleSfx(); return; }
     if (e.code === 'KeyN') { e.preventDefault(); toggleMusic(); return; }
@@ -3755,6 +3805,7 @@
     const dt = last ? Math.min((now - last) / 1000, 1 / 30) : 0;
     last = now;
     update(dt);
+    stepEngine();
     draw();
     // länken tillbaka till spelen ligger över rutornas hörn, så den göms medan en är öppen
     if (backLink && backLink.hidden !== !!overlay) backLink.hidden = !!overlay;
