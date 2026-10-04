@@ -82,6 +82,11 @@
   font-size: 22px;
 }
 
+.soon {
+  background: #f3e6c2;
+  color: var(--dirt);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none; }
 }
