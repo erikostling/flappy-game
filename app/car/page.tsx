@@ -11,10 +11,11 @@ export const metadata: Metadata = {
 
 const DESCRIPTION = [
   'Car Game. Tryck på Starta, mellanslag eller Enter för att börja.',
-  'Du kör en röd F1-bil ett varv runt en racerbana, med din figur vid ratten.',
-  'Svep med fingret åt sidan så följer bilen med, eller håll på vänster eller höger halva av skärmen eller pil- eller A- och D-tangenterna för att styra.',
+  'Du kör en röd F1-bil ett varv runt en racerbana mot fyra motståndare, med din figur vid ratten.',
+  'Bilen kör bara medan du håller fingret på skärmen, eller pil upp, W eller mellanslag; släpper du stannar den.',
+  'Dra fingret åt sidan så följer bilen med, eller styr med pil- eller A- och D-tangenterna.',
   'Håll dig på banan: på gräset går det långsammare, och i kurvorna drar bilen utåt. Kartan uppe till höger visar var på banan du är.',
-  'Poängen är tiden för varvet; ju snabbare desto bättre. Blå mynt på banan köper figurer.',
+  'Poängen är tiden för varvet; ju snabbare desto bättre. Sakerna på banan drar av tid, från en tiondels sekund för ett mynt till en hel sekund för en diamant, och blå mynt köper figurer.',
   'Knapparna längst ner på startskärmen öppnar Figurer, Inställningar och Topplista.',
 ].join(' ');
 

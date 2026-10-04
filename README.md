@@ -21,7 +21,7 @@ Topplistan behöver Supabase: kopiera `.env.example` till `.env.local` och fyll 
 |---|---|
 | `app/page.tsx`, `app/page.module.css` | Spelväljaren: ett kort per spel |
 | `app/flappy/page.tsx` | Flappy Game: canvasen och rutan för namn på topplistan |
-| `app/climbing/page.tsx`, `app/car/page.tsx`, `public/runner.js` | Climbing Game och Car Game, med samma ramverk: startskärm med Figurer, Inställningar och Topplista, medaljer, saker att samla och en ruta efter rundan. I Climbing Game klättrar en figur uppför väggen genom 43 världar och väjer för det som faller; i Car Game kör en figur en F1-bil ett varv runt en racerbana, och tiden är poängen |
+| `app/climbing/page.tsx`, `app/car/page.tsx`, `public/runner.js` | Climbing Game och Car Game, med samma ramverk: startskärm med Figurer, Inställningar och Topplista, medaljer, saker att samla och en ruta efter rundan. I Climbing Game klättrar en figur uppför väggen genom 43 världar och väjer för det som faller; i Car Game kör en figur en F1-bil ett varv runt en racerbana mot fyra motståndare, bara medan man trycker, och tiden är poängen; sakerna på banan drar av tid |
 | `app/layout.tsx` | Typsnitt (next/font), titel och viewport |
 | `app/globals.css` | Gemensamma färger och typsnitt, och spelets layout och stil |
 | `public/spel/` | Bilderna på korten i spelväljaren |
