@@ -275,6 +275,9 @@
   // Car Game: farten, tiden för varvet i hundradelar, hur mycket bilen lutar när den
   // svänger, de blå mynten på banan, världen man kör i och om vinsten tog en till nästa
   let carSpeed = 0, lapTime = 0, steerTilt = 0, lastX = W / 2, raceItems = [], raceWorld = 0, unlocked = false;
+  // ett hopp: hur länge bilen är kvar i luften, hur länge hela hoppet varar, och var
+  // bilen var förra bilden, för att se när den kör över kanten på en ramp
+  let air = 0, airTime = 1, lastS = 0;
   // de fyra motståndarna, när man senast krockade med en, och vilken plats man kom på
   let rivals = [], lastBump = -10, place = 0;
   // sakerna på väggen, vad som har hamnat i lådan den här rundan, och metrarna som
@@ -341,7 +344,7 @@
       gap: () => Infinity,
       itemGap: () => Infinity,
       spawn() {}, step: stepRace, drawObstacles: drawRaceCoins, drawBackground: drawCircuit,
-      drawPlayer: (x, y) => drawF1(x, y, steerTilt),
+      drawPlayer: (x, y) => drawRacer(x, y, steerTilt, {}, lift(air, airTime)),
       drawHero: () => {
         ctx.save();
         ctx.translate(W / 2, 285 + Math.sin(time * 2) * 3); ctx.scale(1.9, 1.9);
@@ -359,7 +362,7 @@
     state = 'playing'; climbed = 0; nextSpawnAt = CAR ? 300 : 200; nextMilestone = TRACK.milestone;
     playerX = W / 2; playerY = PLAYER_Y; fallVy = 0; fallSpin = 0; spinV = 0;
     obstacles = []; popups = []; newBest = false; placed = 0; startedAt = time;
-    carSpeed = 0; lapTime = 0; steerTilt = 0; lastX = W / 2; place = 0; unlocked = false;
+    carSpeed = 0; lapTime = 0; steerTilt = 0; lastX = W / 2; place = 0; unlocked = false; air = 0;
     raceWorld = carWorldIndex();
     raceItems = CAR ? placeRaceItems() : [];
     rivals = CAR ? placeRivals() : [];
@@ -586,7 +589,7 @@
       pts.push({ x: (raw[j][0] + (raw[j + 1][0] - raw[j][0]) * f) * k, y: (raw[j][1] + (raw[j + 1][1] - raw[j][1]) * f) * k });
     }
     for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; a.dir = Math.atan2(b.y - a.y, b.x - a.x); }
-    if (start === 0) return pts;
+    if (start === 0) { pts.ramps = placeRamps(pts); return pts; }
     const bend = i => Math.abs(wrapAngle(pts[(i + 2) % n].dir - pts[(i - 2 + n) % n].dir));
     let first = 0, least = Infinity;
     for (let i = 0; i < n; i++) {
@@ -594,7 +597,27 @@
       for (let d = -30; d <= 30; d++) sum += bend((i + d + n) % n);
       if (sum < least) { least = sum; first = i; }
     }
-    return pts.slice(first).concat(pts.slice(0, first));
+    const out = pts.slice(first).concat(pts.slice(0, first));
+    out.ramps = placeRamps(out);
+    return out;
+  }
+  // Hoppen: RAMPS ramper per varv, en i varje del av banan där den är som rakast 300 px
+  // åt båda hållen, och ingen nära starten. Bilen lättar vid rampens bortre kant.
+  const RAMPS = 4, RAMP_LEN = 60;
+  function placeRamps(pts) {
+    const n = pts.length, bend = i => Math.abs(wrapAngle(pts[(i + 2) % n].dir - pts[(i - 2 + n) % n].dir));
+    const part = (LAP - 4000) / RAMPS, ramps = [];
+    for (let k = 0; k < RAMPS; k++) {
+      const from = Math.round((2000 + (k + 0.1) * part) / STEP), to = Math.round((2000 + (k + 0.9) * part) / STEP);
+      let best = from, least = Infinity;
+      for (let i = from; i < to; i++) {
+        let sum = 0;
+        for (let d = -15; d <= 15; d++) sum += bend((i + d + n) % n);
+        if (sum < least) { least = sum; best = i; }
+      }
+      ramps.push(best * STEP);
+    }
+    return ramps;
   }
   // banan i världen som visas, räknad första gången den behövs
   const circuits = [];
@@ -643,7 +666,7 @@
     const drivers = FIGURES.map((_, i) => i).filter(i => i !== figure && !FIGURES[i].gift).sort(() => Math.random() - 0.5);
     return RIVALS.map((r, k) => ({
       ...r, top: r.top + RIVAL_GAIN * raceWorld, fig: drivers[k], number: String(k + 2),
-      s: -70 * k, lat: (k % 2 ? 1 : -1) * 42, wantLat: (k % 2 ? 1 : -1) * 42, speed: 0, done: false,
+      s: -70 * k, lat: (k % 2 ? 1 : -1) * 42, wantLat: (k % 2 ? 1 : -1) * 42, speed: 0, done: false, air: 0, airTime: 1,
     }));
   }
   function stepRivals(t) {
@@ -651,12 +674,16 @@
     for (const r of rivals) {
       const target = r.top * (1 - Math.min(0.25, Math.abs(curveAt(r.s)) * 160));
       r.speed += (target - r.speed) * Math.min(1, t * 0.8);
+      const before = r.s;
       r.s += r.speed * t;
+      if (r.air > 0) r.air = Math.max(0, r.air - t);
+      else if (overRamp(before, r.s)) r.airTime = r.air = hangTime(r.speed);
       r.lat += (r.wantLat - r.lat) * Math.min(1, t * 1.5);
       if (Math.random() < t * 0.3) r.wantLat = (Math.random() - 0.5) * (ROADW - 70);
       if (!r.done && r.s >= LAP) r.done = true;
-      // en krock: bilen tappar fart och knuffas isär från motståndaren
-      if (Math.abs(r.s - climbed) < 62 && Math.abs(r.lat - lane) < 34) {
+      // en krock: bilen tappar fart och knuffas isär från motståndaren, men inte om
+      // någon av dem är i luften
+      if (!air && !r.air && Math.abs(r.s - climbed) < 62 && Math.abs(r.lat - lane) < 34) {
         const side = Math.sign(lane - r.lat) || 1;
         carSpeed = Math.min(carSpeed, r.speed * 0.8);
         shiftCar(side * 4);
@@ -680,16 +707,37 @@
 
   // Bilen kör bara medan man trycker, fortare på banan och saktare på gräset; släpper
   // man rullar den ut och stannar (BRAKE). I kurvorna drar den utåt, så att man måste
-  // styra emot, och den lutar lite åt det håll den svänger.
+  // styra emot, och den lutar lite åt det håll den svänger. Över en ramp hoppar den.
   const BRAKE = 320;
+  // går man över kanten på en ramp mellan `from` och `to`?
+  const overRamp = (from, to) => circuit().ramps.some(r => from < r + RAMP_LEN && to >= r + RAMP_LEN);
+  // hur länge en bil är i luften efter en ramp, längre ju fortare den kör; en som kör
+  // för sakta rullar bara över
+  const hangTime = v => (v < 120 ? 0 : 0.35 + 0.55 * Math.min(1, v / ROAD_SPEED));
+  // hur högt en bil är i ett hopp, från 0 på marken till 1 högst upp
+  const lift = (left, total) => (left > 0 ? Math.sin(Math.PI * (1 - left / total)) : 0);
   function stepRace(t) {
     // under nedräkningen står alla stilla
-    if (time < startedAt) { carSpeed = 0; return null; }
+    if (time < startedAt) { carSpeed = 0; lastS = climbed; return null; }
     stepRivals(t);
-    const lane = playerX - W / 2, onRoad = Math.abs(lane) < ROADW / 2 - 6;
-    if (gas()) carSpeed += ((onRoad ? ROAD_SPEED : GRASS_SPEED) - carSpeed) * Math.min(1, t * (onRoad ? 0.8 : 2.5));
-    else carSpeed = Math.max(0, carSpeed - BRAKE * t * (onRoad ? 1 : 1.6));
-    shiftCar(-curveAt(climbed) * carSpeed * carSpeed * 0.28 * t);
+    if (air > 0) {
+      air = Math.max(0, air - t);
+      if (!air) play('crash', 0.25, 1.6);
+    } else if (overRamp(lastS, climbed)) {
+      airTime = air = hangTime(carSpeed);
+      if (air) {
+        play('swish', 0.6);
+        popups.push({ text: 'Hopp!', at: time, x: playerX, y: PLAYER_Y - 80, size: 26 });
+      }
+    }
+    lastS = climbed;
+    // i luften håller bilen farten och drar inte utåt i kurvorna
+    if (!air) {
+      const lane = playerX - W / 2, onRoad = Math.abs(lane) < ROADW / 2 - 6;
+      if (gas()) carSpeed += ((onRoad ? ROAD_SPEED : GRASS_SPEED) - carSpeed) * Math.min(1, t * (onRoad ? 0.8 : 2.5));
+      else carSpeed = Math.max(0, carSpeed - BRAKE * t * (onRoad ? 1 : 1.6));
+      shiftCar(-curveAt(climbed) * carSpeed * carSpeed * 0.28 * t);
+    }
     if (t > 0) steerTilt += (Math.max(-0.35, Math.min(0.35, (playerX - lastX) / t * 0.0025)) - steerTilt) * Math.min(1, t * 10);
     lastX = playerX;
     for (const it of raceItems) {
@@ -944,12 +992,15 @@
     ctx.beginPath(); ctx.moveTo(x - 2.5, y - 2.5); ctx.lineTo(x + 2.5, y + 2.5); ctx.moveTo(x + 2.5, y - 2.5); ctx.lineTo(x - 2.5, y + 2.5); ctx.stroke();
   }
   // Kryss när figuren har fallit; `color` är kryssens färg, för de mörka ansiktena.
+  // `gaze` är hur långt upp pupillerna tittar: föraren i Car Game tittar framåt på
+  // vägen, som går uppåt på skärmen.
+  let gaze = 0;
   function eyes(dead, y = -9, gap = 4, color = C.ink) {
     for (const ex of [-gap, gap]) {
       if (dead) cross(ex, y, color);
       else {
         oval(ex, y, 3.8, 4.2, C.white);
-        oval(ex, y + 0.5, 2, 2.3, C.ink);
+        oval(ex, y + 0.5 - gaze, 2, 2.3, C.ink);
       }
     }
   }
@@ -1801,7 +1852,7 @@
     stroke([[-12, -11], [12, -6]], '#1d1d1d', 1.2);
     oval(-4.5, -8, 4, 3.6, '#1d1d1d');
     if (dead) cross(4.5, -8);
-    else { oval(4.5, -8, 3.6, 4, C.white); oval(4.5, -7.5, 2, 2.3, C.ink); }
+    else { oval(4.5, -8, 3.6, 4, C.white); oval(4.5, -7.5 - gaze, 2, 2.3, C.ink); }
     smile(dead, -1.5, '#8a4a2a', 3.5);
   }
   function pirateNape() {
@@ -2976,17 +3027,46 @@
       if (Math.floor(mid[i][0] / 40) % 2) continue;
       ctx.beginPath(); ctx.moveTo(mid[i - 1][1][0], mid[i - 1][1][1]); ctx.lineTo(mid[i][1][0], mid[i][1][1]); ctx.stroke();
     }
+    // en bit av banan från s0 till s1, mellan lat0 och lat1 från mitten
+    const band = (s0, s1, lat0, lat1, color) => {
+      const quad = [trackPoint(s0, lat0), trackPoint(s0, lat1), trackPoint(s1, lat1), trackPoint(s1, lat0)].map(q => toScreen(q, me));
+      ctx.beginPath(); quad.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
+      ctx.fillStyle = color; ctx.fill();
+    };
     // mållinjen: rutigt band tvärs över banan
     for (let lap = Math.ceil(from / LAP) * LAP; lap <= to; lap += LAP) {
       for (let row = 0; row < 2; row++) {
         for (let k = 0; k < 10; k++) {
           const lat = -ROADW / 2 + k * ROADW / 10;
-          const quad = [trackPoint(lap + row * 9, lat), trackPoint(lap + row * 9, lat + ROADW / 10), trackPoint(lap + row * 9 + 9, lat + ROADW / 10), trackPoint(lap + row * 9 + 9, lat)].map(q => toScreen(q, me));
-          ctx.beginPath(); quad.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath();
-          ctx.fillStyle = (k + row) % 2 ? C.ink : C.white; ctx.fill();
+          band(lap + row * 9, lap + row * 9 + 9, lat, lat + ROADW / 10, (k + row) % 2 ? C.ink : C.white);
         }
       }
     }
+    // ramperna: gula och svarta ränder tvärs över banan, ljusare mot kanten där bilen
+    // lättar, och en skugga bakom kanten
+    const SLOPE = [['#d9a800', '#262626'], ['#ecbd1c', '#333333'], ['#ffd23f', '#444444']];
+    for (const r of circuit().ramps) {
+      if (r + RAMP_LEN + 20 < from || r > to) continue;
+      band(r + RAMP_LEN, r + RAMP_LEN + 16, -ROADW / 2, ROADW / 2, 'rgba(0,0,0,0.28)');
+      SLOPE.forEach(([yellow, black], row) => {
+        const s0 = r + row * RAMP_LEN / 3;
+        for (let k = 0; k < 8; k++) {
+          const lat = -ROADW / 2 + k * ROADW / 8;
+          band(s0, s0 + RAMP_LEN / 3, lat, lat + ROADW / 8, k % 2 ? black : yellow);
+        }
+      });
+      band(r + RAMP_LEN - 3, r + RAMP_LEN, -ROADW / 2, ROADW / 2, C.white);
+    }
+  }
+
+  // En bil, på marken eller i ett hopp: högt upp är skuggan längre bort och bilen större,
+  // som om den kom närmare.
+  function drawRacer(x, y, angle, opts, h) {
+    if (h > 0) oval(x + 18 * h, y + 30 * h, 20, 34, `rgba(0,0,0,${0.35 - 0.1 * h})`, angle);
+    ctx.save();
+    ctx.translate(x, y - 20 * h); ctx.scale(1 + 0.4 * h, 1 + 0.4 * h);
+    drawF1(0, 0, angle, opts);
+    ctx.restore();
   }
 
   // Motståndarna och sakerna på banan, där de är.
@@ -2995,7 +3075,7 @@
     for (const r of rivals) {
       if (r.s < climbed - 300 || r.s > climbed + 800) continue;
       const [x, y] = toScreen(trackPoint(r.s, r.lat), me);
-      drawF1(x, y, wrapAngle(trackAt(r.s).dir - me.dir), r);
+      drawRacer(x, y, wrapAngle(trackAt(r.s).dir - me.dir), r, lift(r.air, r.airTime));
     }
     for (const it of raceItems) {
       if (it.s < climbed - 200 || it.s > climbed + 800) continue;
@@ -3027,7 +3107,7 @@
   }
 
   // Ens egen bil: en röd F1-bil uppifrån, med nosen uppåt, vingar fram och bak, stora
-  // hjul utanför karossen och figuren man har valt i cockpiten, sedd bakifrån.
+  // hjul utanför karossen och figuren man har valt i cockpiten, som tittar framåt.
   function drawF1(x, y, angle = 0, { color: red = '#e63946', dark = '#9e1b25', fig = figure, number = '1' } = {}) {
     ctx.save();
     ctx.translate(x, y); ctx.rotate(angle);
@@ -3042,8 +3122,10 @@
     ctx.fillStyle = red; ctx.fill(); ctx.strokeStyle = dark; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.fillStyle = C.white; ctx.fillRect(-1.5, -33, 3, 18);
     rr(-7, -10, 14, 18, 6); ctx.fillStyle = '#1d1d1d'; ctx.fill();
-    // föraren: figurens huvud, bakifrån, som man ser det när bilen kör uppåt
-    ctx.save(); ctx.translate(0, 2); ctx.scale(0.42, 0.42); drawHead(FIGURES[fig], false, true); ctx.restore();
+    // föraren: figurens huvud, som tittar framåt på vägen
+    gaze = 1.9;
+    ctx.save(); ctx.translate(0, 2); ctx.scale(0.42, 0.42); drawHead(FIGURES[fig], false, false); ctx.restore();
+    gaze = 0;
     ctx.fillStyle = C.white; ctx.font = `10px ${DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(number, 0, 19);
     ctx.restore();
