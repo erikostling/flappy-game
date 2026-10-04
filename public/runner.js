@@ -3438,8 +3438,9 @@
     if (TRACK.worlds) say(`Värld ${worldIndex(climbed) + 1}: ${worldAt(climbed).name}`, W / 2, py + 232, 15, { font: BODY, weight: '800', fill: C.dirt, outline: null });
     if (placed) say(`Plats ${placed} på topplistan!`, W / 2, py + 266 + extra, 18, { fill: C.ink, outline: null });
     ctx.globalAlpha = time - overAt > 0.6 ? 1 : 0.5;
-    drawButton(OVER_BTN, 'Gå till startsidan', 24);
-    drawButton(AGAIN_BTN, 'Spela igen', 24);
+    // efter en vinst som gav en ny värld fortsätter man dit med samma knapp
+    drawButton(OVER_BTN, unlocked ? 'Gå till hemskärm' : 'Gå till startsidan', 24);
+    drawButton(AGAIN_BTN, unlocked ? 'Fortsätt' : 'Spela igen', 24);
     ctx.globalAlpha = 1;
   }
 
