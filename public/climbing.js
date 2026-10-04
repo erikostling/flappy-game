@@ -183,10 +183,9 @@
   }
   refreshBoard();
 
-  // Än så länge får bara några spela: enheter som äger ett av namnen i EARLY på någon av
-  // topplistorna. Alla andra ser att spelet kommer snart. Med EARLY satt till null får
-  // alla spela.
-  const EARLY = ['wilhelm', 'admin'];
+  // Med en lista i EARLY får bara enheter som äger ett av namnen spela; alla andra ser
+  // att spelet kommer snart. Med null får alla spela.
+  const EARLY = null;
   let access = EARLY ? 'checking' : 'yes'; // checking, yes eller no
   function checkAccess() {
     if (access !== 'checking') return;
@@ -209,7 +208,6 @@
 
   // Går listan inte att hämta går den inte heller att skriva in sig på.
   const qualifies = m => listMode === 'ready' && m > 0 && (topList.length < TOP || m > topList[TOP - 1].score);
-  const rankFor = m => topList.filter(e => e.score >= m).length + 1;
 
   // ---------- Sakerna ----------
 
@@ -276,7 +274,7 @@
   let powers = [], shield = false, magnetUntil = 0, slowUntil = 0, safeUntil = 0, flash = 0;
   // den bästa medaljen den här rundan (-1 för ingen), och när den kom
   let medal = -1, medalShownAt = -10;
-  // 'figures', 'settings' och 'scores' är rutorna på startskärmen; 'entry' är namnrutan
+  // 'figures', 'settings' eller 'scores' när en av startskärmens rutor är öppen
   let overlay = null;
   let best = Math.max(0, Math.floor(Number(load('climbing-best')) || 0)), newBest = false;
   // raden man sparade på topplistan, och vilken plats den fick den här rundan
@@ -328,7 +326,7 @@
     // det som föll står inte stilla bakom rutan
     falling = []; items = []; powers = [];
     if (newBest) play('fanfare', 0.45);
-    if (qualifies(meters())) openEntry();
+    saveResult();
   }
 
   function enterWorld() {
@@ -457,72 +455,20 @@
     popups = popups.filter(p => time - p.at < 1.2);
   }
 
-  // ---------- Namnrutan ----------
+  // ---------- Topplistan efter ett fall ----------
 
-  const entryForm = document.getElementById('climb-entry');
-  const entryTitle = document.getElementById('climb-entry-title');
-  const entryName = document.getElementById('climb-entry-name');
-  const entrySave = document.getElementById('climb-entry-save');
-  const entrySkip = document.getElementById('climb-entry-skip');
-  const entryError = document.getElementById('climb-entry-error');
-  let entryScore = 0, saving = false;
-
-  function showEntryError(text) { entryError.textContent = text; entryError.hidden = false; }
-
-  function openEntry() {
-    overlay = 'entry';
-    entryScore = meters();
-    entryTitle.textContent = `Plats ${rankFor(entryScore)} med ${entryScore} m`;
-    entryName.value = load('flappy-apa-namn') || '';
-    entryError.hidden = true;
-    entrySave.disabled = false;
-    entrySave.textContent = 'Spara';
-    entryForm.hidden = false;
-    entryName.focus({ preventScroll: true });
-    entryName.select();
-  }
-
-  // Rutan med höjden och rekordet visas när namnrutan stängs.
-  function closeEntry() {
-    entryForm.hidden = true;
-    overlay = null; overAt = time;
-    canvas.focus({ preventScroll: true });
-  }
-
-  entryForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    if (saving) return;
-    const name = entryName.value.replace(/\s+/g, ' ').trim().slice(0, 12);
-    if (!name) { showEntryError('Skriv ett namn först.'); entryName.focus(); return; }
-    const held = topList.find(e => nameKey(e.name) === nameKey(name));
-    if (held && held.score >= entryScore) {
-      showEntryError(ownedNames.has(nameKey(name))
-        ? `Ditt bästa på listan är redan ${held.score} m.`
-        : `${held.name} har redan ${held.score} m på listan. Välj ett annat namn eller hoppa över.`);
-      entryName.focus();
-      return;
-    }
-    saving = true;
-    entrySave.disabled = true;
-    entrySave.textContent = 'Sparar…';
+  // Kommer man in på topplistan sparas resultatet av sig självt, under namnet man
+  // valde första gången (public/player.js). Utan namn sparas inget.
+  async function saveResult() {
+    const name = window.player?.name?.(), score = meters();
+    if (!name || !qualifies(score)) return;
     try {
-      await scoresRequest({ name, score: entryScore, figure: FIGURES[figure].id });
-      savedEntry = topList.find(e => nameKey(e.name) === nameKey(name) && e.score === entryScore) ?? null;
+      await scoresRequest({ name, score, figure: FIGURES[figure].id });
+      savedEntry = topList.find(e => nameKey(e.name) === nameKey(name) && e.score === score) ?? null;
       placed = savedEntry ? topList.indexOf(savedEntry) + 1 : 0;
-      store('flappy-apa-namn', name);
-      play('select', 0.5);
-      closeEntry();
-    } catch (err) {
-      showEntryError(err?.status === 409
-        ? 'Det namnet hör till någon annan. Välj ett annat.'
-        : 'Det gick inte att spara. Försök igen.');
-      entrySave.disabled = false;
-      entrySave.textContent = 'Spara';
-    } finally {
-      saving = false;
-    }
-  });
-  entrySkip.addEventListener('click', closeEntry);
+      if (placed) play('chime', 0.6);
+    } catch {}
+  }
 
   // ---------- Ritverktyg ----------
 
@@ -2885,11 +2831,10 @@
     drawCloseButton(BOARD_CLOSE);
   }
 
-  // Efter ett fall: hur högt man kom och rekordet, och platsen på topplistan om man
-  // sparade sig där. Medan namnrutan är öppen syns bara väggen bakom den.
+  // Efter ett fall: hur högt man kom och rekordet, och platsen på topplistan om
+  // resultatet kom in där.
   function drawOver() {
     dim();
-    if (overlay === 'entry') return;
     const pw = 260, ph = placed ? 280 : 240, px = W / 2 - pw / 2, py = 150;
     say('Du föll!', W / 2, 122, 56, { fill: C.banana });
     drawPanel({ x: px, y: py, w: pw, h: ph });
@@ -3026,7 +2971,7 @@
 
   canvas.addEventListener('pointerdown', e => {
     e.preventDefault();
-    if (overlay === 'entry' || access !== 'yes') return;
+    if (access !== 'yes' || window.player?.busy()) return;
     canvas.focus({ preventScroll: true });
     startMusic();
     const p = toWorld(e);
@@ -3066,8 +3011,7 @@
   // Som i Flappy Game: F öppnar Figurer, T Topplistan, och M och N stänger av och
   // sätter på ljudeffekter och musik.
   window.addEventListener('keydown', e => {
-    if (access !== 'yes') return;
-    if (overlay === 'entry') { if (e.code === 'Escape') closeEntry(); return; }
+    if (access !== 'yes' || window.player?.busy()) return;
     startMusic();
     const go = e.code === 'Space' || e.code === 'Enter';
     if (e.code === 'KeyM') { e.preventDefault(); toggleSfx(); return; }

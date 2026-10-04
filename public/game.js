@@ -540,7 +540,7 @@
     try { return Math.max(0, Math.floor(Number(JSON.parse(load('flappy-apa-medaljer') || '{}')[m.id]) || 0)); } catch { return 0; }
   });
   let time = 0, overAt = 0, flash = 0, groundX = 0, hillX = 0, travel = 0;
-  let overlay = null; // null | 'figures' | 'settings' | 'scores' | 'entry'
+  let overlay = null; // null | 'figures' | 'settings' | 'scores'
   let paused = false;
 
   // Första gången väljer man en av tre startfigurer. Den blir ens första figur och
@@ -681,7 +681,8 @@
   // först; enheten känns igen på en slumpad nyckel som bara finns här.
   let mode = 'loading'; // 'loading' | 'ready' | 'error'
   let topList = [];
-  let entryScore = 0, pendingEntry = false, afterSave = false, savedEntry = null, saving = false;
+  // efter ett fall: resultatet som sparades på listan, och om listan ska visas
+  let afterSave = false, savedEntry = null;
 
   function cleanEntries(raw) {
     if (!Array.isArray(raw)) return [];
@@ -715,7 +716,6 @@
     const b = board();
     return mode === 'ready' && s > 0 && (b.length < TOP || s > b[TOP - 1].score);
   }
-  const rankFor = s => board().filter(e => e.score >= s).length + 1;
 
   function deviceKey() {
     let key = load('flappy-apa-nyckel');
@@ -756,17 +756,17 @@
   if (savedName) refreshBoard('/api/scores/claim', { name: savedName });
   else refreshBoard();
 
-  async function saveEntry(name) {
-    const score = entryScore;
-    await scoresRequest('/api/scores', { name, score, figure: CHARACTERS[charIndex].id }, true);
-    // raden som servern sparade, så att den markeras på listan
-    return topList.find(e => nameKey(e.name) === nameKey(name) && e.score === score) ?? null;
-  }
-
-  function saveError(err) {
-    if (err?.status === 409) return 'Det namnet hör till någon annan. Välj ett annat.';
-    if (err?.status === 429) return 'Listan tar inte emot fler namn just nu.';
-    return 'Det gick inte att spara. Försök igen.';
+  // Kommer man in på topplistan sparas resultatet av sig självt, under namnet man
+  // valde första gången (public/player.js), och listan visas med ens rad markerad.
+  // Utan namn sparas inget.
+  async function saveResult(score) {
+    const name = window.player?.name?.();
+    if (!name || !qualifies(score)) return;
+    try {
+      await scoresRequest('/api/scores', { name, score, figure: CHARACTERS[charIndex].id }, true);
+      savedEntry = topList.find(e => nameKey(e.name) === nameKey(name) && e.score === score) ?? null;
+      if (savedEntry && state === 'over') { afterSave = true; overAt = time; sfx.select(); }
+    } catch {}
   }
 
   // ---------- Ljud ----------
@@ -1034,7 +1034,7 @@
     items = []; popups = []; box = ITEMS.map(() => 0);
     powers = []; shield = false; magnetUntil = slowUntil = safeUntil = 0; medal = -1;
     worldStep = 0; nextWorldAt = WORLD_EVERY;
-    pendingEntry = false; afterSave = false; savedEntry = null;
+    afterSave = false; savedEntry = null;
   }
 
   // Nästa värld i ordningen; hinder som redan syns behåller sin sort. Varje ny värld
@@ -1110,7 +1110,7 @@
       sfx.flap(FLAP_SOUND[CHARACTERS[charIndex].id]);
       return;
     }
-    if (state === 'over' && !pendingEntry && time - overAt > 0.6) reset();
+    if (state === 'over' && time - overAt > 0.6) reset();
   }
 
   function crash() {
@@ -1125,8 +1125,7 @@
       store('flappy-apa-lada', JSON.stringify(Object.fromEntries(ITEMS.map((it, i) => [it.id, lifetime[i]]))));
     }
     if (score > best) { best = score; newBest = true; store('flappy-apa-best', best); sfx.fanfare(0.45); }
-    entryScore = score;
-    pendingEntry = qualifies(score);
+    saveResult(score);
   }
 
   function openOverlay(name) {
@@ -1185,7 +1184,6 @@
     time += dt;
     flash = Math.max(0, flash - dt * 4);
     player.flapT = Math.max(0, player.flapT - dt);
-    if (state === 'over' && pendingEntry && !overlay && time - overAt > 0.9) openEntry();
     if (overlay || paused) return;
     if (time < slowUntil) dt *= SLOW;
 
@@ -1259,67 +1257,6 @@
     }
     return list.filter(it => !it.taken && it.x > VX0 - 30);
   }
-
-  // ---------- Namnrutan ----------
-
-  const entryForm = document.getElementById('entry');
-  const entryTitle = document.getElementById('entry-title');
-  const entryName = document.getElementById('entry-name');
-  const entrySave = document.getElementById('entry-save');
-  const entrySkip = document.getElementById('entry-skip');
-  const entryError = document.getElementById('entry-error');
-
-  function showEntryError(text) { entryError.textContent = text; entryError.hidden = false; }
-
-  function openEntry() {
-    pendingEntry = false;
-    overlay = 'entry';
-    entryTitle.textContent = `Plats ${rankFor(entryScore)} med ${entryScore} poäng`;
-    entryName.value = load('flappy-apa-namn') || '';
-    entryError.hidden = true;
-    entrySave.disabled = false;
-    entrySave.textContent = 'Spara';
-    entryForm.hidden = false;
-    entryName.focus({ preventScroll: true });
-    entryName.select();
-  }
-
-  function closeEntry() {
-    entryForm.hidden = true;
-    closeOverlay();
-  }
-
-  entryForm.addEventListener('submit', async e => {
-    e.preventDefault();
-    if (saving) return;
-    const name = entryName.value.replace(/\s+/g, ' ').trim().slice(0, 12);
-    if (!name) { showEntryError('Skriv ett namn först.'); entryName.focus(); return; }
-    const held = board().find(e => nameKey(e.name) === nameKey(name));
-    if (held && held.score >= entryScore) {
-      showEntryError(ownedNames.has(nameKey(name))
-        ? `Ditt bästa på listan är redan ${held.score} poäng.`
-        : `${held.name} har redan ${held.score} poäng på listan. Välj ett annat namn eller hoppa över.`);
-      entryName.focus();
-      return;
-    }
-    saving = true;
-    entrySave.disabled = true;
-    entrySave.textContent = 'Sparar…';
-    try {
-      savedEntry = await saveEntry(name);
-      store('flappy-apa-namn', name);
-      afterSave = true; overAt = time;
-      sfx.select();
-      closeEntry();
-    } catch (err) {
-      showEntryError(saveError(err));
-      entrySave.disabled = false;
-      entrySave.textContent = 'Spara';
-    } finally {
-      saving = false;
-    }
-  });
-  entrySkip.addEventListener('click', closeEntry);
 
   // ---------- Ritverktyg ----------
 
@@ -4986,8 +4923,6 @@
   }
 
   function drawOver() {
-    if (overlay === 'entry') { dim(); return; }
-    if (pendingEntry) { say('Krasch!', W / 2, 130, 56, { fill: C.banana }); return; }
     if (afterSave) { drawBoard('again'); return; }
 
     const pw = 250, ph = 262, px = W / 2 - pw / 2, py = 165;
@@ -5098,7 +5033,8 @@
 
   canvas.addEventListener('pointerdown', e => {
     e.preventDefault();
-    if (overlay === 'entry') return;
+    // medan namnrutan är öppen startar inget
+    if (window.player?.busy()) return;
     canvas.focus({ preventScroll: true });
     sfx.unlock();
     const p = toWorld(e);
@@ -5127,7 +5063,7 @@
   });
 
   window.addEventListener('keydown', e => {
-    if (overlay === 'entry') { if (e.code === 'Escape') closeEntry(); return; }
+    if (window.player?.busy()) return;
     sfx.unlock();
     if (e.code === 'KeyM') { e.preventDefault(); sfx.toggleSfx(); return; }
     if (e.code === 'KeyN') { e.preventDefault(); sfx.toggleMusic(); return; }

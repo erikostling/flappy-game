@@ -16,8 +16,6 @@ const GAMES: { href: string; name: string; text: string; image: string; soon?: b
     name: 'Climbing Game',
     text: 'Klättra uppför tegelväggen så högt du kan.',
     image: '/spel/climbing-game.png',
-    // än så länge får bara några spela; spelet säger själv vem
-    soon: true,
   },
 ];
 

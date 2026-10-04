@@ -26,6 +26,7 @@ Topplistan behöver Supabase: kopiera `.env.example` till `.env.local` och fyll 
 | `app/globals.css` | Gemensamma färger och typsnitt, och spelets layout och stil |
 | `public/spel/` | Bilderna på korten i spelväljaren |
 | `app/api/scores/route.ts` | API för topplistan: `GET` ger de tio bästa, `POST` sparar ett resultat |
+| `app/api/player/route.ts`, `public/player.js`, `app/player-form.tsx` | Spelarens namn: väljs första gången och går aldrig att byta; topplistorna sparar under det, av sig självt |
 | `app/api/climbing/scores/route.ts` | Climbing Games topplista i meter, som `/api/scores`; ett namn hör till samma enhet i båda spelen |
 | `app/api/scores/claim/route.ts` | Kopplar ett namn från innan namnen fick ägare till enheten |
 | `lib/scores.ts` | Det API-vägarna delar: hämta och spara en lista, enhetens nyckel |

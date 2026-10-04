@@ -42,7 +42,22 @@ export async function board(db: Db, hash: string | null, list: Board = FLAPPY) {
   const failed = own.find(r => r.error);
   if (failed?.error) throw failed.error;
   const mine = new Set(own.flatMap(r => (r.data as { name_key: string }[]).map(row => row.name_key)));
+  const player = await playerName(db, hash);
+  if (player) mine.add(player.toLowerCase());
   return { entries, mine: [...mine] };
+}
+
+// Namnet enheten valde första gången den spelade, eller null. Med `name` tar den det
+// namnet om enheten inte har något än; är det upptaget svarar den 'taken'.
+export async function claimPlayer(db: Db, hash: string, name = '') {
+  const { data, error } = await db.rpc('claim_player', { p_name: name, p_owner: hash });
+  if (error) throw error;
+  if (typeof data === 'string' && data.startsWith('mine:')) return data.slice(5);
+  return data === 'taken' ? 'taken' : null;
+}
+async function playerName(db: Db, hash: string) {
+  const name = await claimPlayer(db, hash);
+  return name === 'taken' ? null : name;
 }
 
 export const cleanName = (value: unknown) =>
