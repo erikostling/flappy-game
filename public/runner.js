@@ -829,7 +829,7 @@
     return null;
   }
 
-  // tiden på klockan: hur länge man har kört, och noll under nedräkningen
+  // tiden på klockan: hur länge man har kört, och noll innan startljuset är grönt
   const lapClock = () => Math.max(0, raceTime());
 
   function collectRaceItem(it) {
