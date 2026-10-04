@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
-import { scriptUrl } from '@/lib/scripts';
+import { versioned } from '@/lib/versioned';
 import { PlayerForm } from '../player-form';
 import styles from './page.module.css';
 
@@ -34,7 +34,7 @@ export default function ClimbingGame() {
       <PlayerForm />
       <a className="back" href="/" id="climb-back">← Spel</a>
       <div className={styles.safe} id="climb-safe" aria-hidden="true" />
-      <Script src={scriptUrl('climbing.js')} strategy="afterInteractive" />
+      <Script src={versioned('climbing.js')} strategy="afterInteractive" />
     </main>
   );
 }
