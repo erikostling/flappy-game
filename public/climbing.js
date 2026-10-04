@@ -172,12 +172,26 @@
     ownedNames = new Set(Array.isArray(data?.mine) ? data.mine : []);
     listMode = 'ready';
     giveMakerFigures();
+    checkAccess();
   }
   // Hämtar listan på nytt; går det inte behålls den som redan hämtats.
   async function refreshBoard() {
-    try { await scoresRequest(); } catch { if (listMode === 'loading') listMode = 'error'; }
+    try { await scoresRequest(); } catch {
+      if (listMode === 'loading') listMode = 'error';
+      if (access === 'checking') access = 'no';
+    }
   }
   refreshBoard();
+
+  // Än så länge får bara några spela: enheter som äger ett av namnen i EARLY på någon av
+  // topplistorna. Alla andra ser att spelet kommer snart. Med EARLY satt till null får
+  // alla spela.
+  const EARLY = ['wilhelm', 'admin'];
+  let access = EARLY ? 'checking' : 'yes'; // checking, yes eller no
+  function checkAccess() {
+    if (access !== 'checking') return;
+    access = EARLY.some(name => ownedNames.has(name)) ? 'yes' : 'no';
+  }
 
   // Den som gör spelet har alla figurer: enheten som äger namnet MAKER på någon av
   // topplistorna. Flappy Game gör likadant, och figurerna är desamma i båda spelen.
@@ -2647,8 +2661,22 @@
     }
   }
 
+  // Skärmen för den som inte får spela än, eller medan det kollas.
+  function drawLocked() {
+    drawTitle('Climbing Game', W / 2, 150, 50);
+    const P = { x: 40, y: 220, w: 320, h: 170 };
+    drawPanel(P);
+    if (access === 'checking') say('Ett ögonblick…', W / 2, P.y + P.h / 2, 22, { fill: C.ink, outline: null });
+    else {
+      say('Kommer snart!', W / 2, P.y + 50, 32, { fill: C.ink, outline: null });
+      say('Än så länge kan bara Wilhelm spela', W / 2, P.y + 98, 15, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+      say('Knappen Spel tar dig tillbaka', W / 2, P.y + 128, 13, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+    }
+  }
+
   function draw() {
     drawWall();
+    if (access !== 'yes') { drawLocked(); return; }
     if (state === 'ready') drawStart();
     else {
       for (const it of items) {
@@ -2690,7 +2718,7 @@
 
   canvas.addEventListener('pointerdown', e => {
     e.preventDefault();
-    if (overlay === 'entry') return;
+    if (overlay === 'entry' || access !== 'yes') return;
     canvas.focus({ preventScroll: true });
     startMusic();
     const p = toWorld(e);
@@ -2730,6 +2758,7 @@
   // Som i Flappy Game: F öppnar Figurer, T Topplistan, och M och N stänger av och
   // sätter på ljudeffekter och musik.
   window.addEventListener('keydown', e => {
+    if (access !== 'yes') return;
     if (overlay === 'entry') { if (e.code === 'Escape') closeEntry(); return; }
     startMusic();
     const go = e.code === 'Space' || e.code === 'Enter';
