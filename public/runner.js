@@ -944,12 +944,15 @@
     ctx.beginPath(); ctx.moveTo(x - 2.5, y - 2.5); ctx.lineTo(x + 2.5, y + 2.5); ctx.moveTo(x + 2.5, y - 2.5); ctx.lineTo(x - 2.5, y + 2.5); ctx.stroke();
   }
   // Kryss när figuren har fallit; `color` är kryssens färg, för de mörka ansiktena.
+  // `gaze` är hur långt upp pupillerna tittar: föraren i Car Game tittar framåt på
+  // vägen, som går uppåt på skärmen.
+  let gaze = 0;
   function eyes(dead, y = -9, gap = 4, color = C.ink) {
     for (const ex of [-gap, gap]) {
       if (dead) cross(ex, y, color);
       else {
         oval(ex, y, 3.8, 4.2, C.white);
-        oval(ex, y + 0.5, 2, 2.3, C.ink);
+        oval(ex, y + 0.5 - gaze, 2, 2.3, C.ink);
       }
     }
   }
@@ -1801,7 +1804,7 @@
     stroke([[-12, -11], [12, -6]], '#1d1d1d', 1.2);
     oval(-4.5, -8, 4, 3.6, '#1d1d1d');
     if (dead) cross(4.5, -8);
-    else { oval(4.5, -8, 3.6, 4, C.white); oval(4.5, -7.5, 2, 2.3, C.ink); }
+    else { oval(4.5, -8, 3.6, 4, C.white); oval(4.5, -7.5 - gaze, 2, 2.3, C.ink); }
     smile(dead, -1.5, '#8a4a2a', 3.5);
   }
   function pirateNape() {
@@ -3027,7 +3030,7 @@
   }
 
   // Ens egen bil: en röd F1-bil uppifrån, med nosen uppåt, vingar fram och bak, stora
-  // hjul utanför karossen och figuren man har valt i cockpiten, sedd bakifrån.
+  // hjul utanför karossen och figuren man har valt i cockpiten, som tittar framåt.
   function drawF1(x, y, angle = 0, { color: red = '#e63946', dark = '#9e1b25', fig = figure, number = '1' } = {}) {
     ctx.save();
     ctx.translate(x, y); ctx.rotate(angle);
@@ -3042,8 +3045,10 @@
     ctx.fillStyle = red; ctx.fill(); ctx.strokeStyle = dark; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.fillStyle = C.white; ctx.fillRect(-1.5, -33, 3, 18);
     rr(-7, -10, 14, 18, 6); ctx.fillStyle = '#1d1d1d'; ctx.fill();
-    // föraren: figurens huvud, bakifrån, som man ser det när bilen kör uppåt
-    ctx.save(); ctx.translate(0, 2); ctx.scale(0.42, 0.42); drawHead(FIGURES[fig], false, true); ctx.restore();
+    // föraren: figurens huvud, som tittar framåt på vägen
+    gaze = 1.9;
+    ctx.save(); ctx.translate(0, 2); ctx.scale(0.42, 0.42); drawHead(FIGURES[fig], false, false); ctx.restore();
+    gaze = 0;
     ctx.fillStyle = C.white; ctx.font = `10px ${DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(number, 0, 19);
     ctx.restore();
