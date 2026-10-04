@@ -2657,10 +2657,11 @@
     blob(x - r * 0.35, y - r * 0.35, r * 0.22, 'rgba(255,255,255,0.7)');
   }
 
-  // En medalj och dess namn, centrerade kring x.
+  // En medalj och dess namn, centrerade kring x, eller slutande vid x med align 'right'.
   function drawMedalLine(m, x, y, size, text, opts) {
     ctx.font = `${opts.weight ?? ''} ${size}px ${opts.font ?? DISPLAY}`.trim();
-    const r = size * 0.5, tw = ctx.measureText(text).width, left = x - (tw + r * 2 + 8) / 2;
+    const r = size * 0.5, width = ctx.measureText(text).width + r * 2 + 8;
+    const left = opts.align === 'right' ? x - width : x - width / 2;
     drawMedal(m, left + r, y, r);
     say(text, left + r * 2 + 8, y + 1, size, { ...opts, align: 'left' });
   }
@@ -2908,18 +2909,21 @@
     say(`${meters()} m`, W / 2, UI_T + 46, 44);
     say(`Rekord ${best} m`, W / 2, UI_T + 80, 14, { font: BODY, weight: '800' });
     say(`${worldAt(climbed).name} · värld ${worldIndex(climbed) + 1} av ${WORLDS.length}`, W / 2, UI_T + 100, 13, { font: BODY, weight: '800' });
-    const mk = (time - medalShownAt) / 1.8;
-    if (medal >= 0 && mk >= 0 && mk < 1) {
-      ctx.globalAlpha = mk < 0.75 ? 1 : (1 - mk) * 4;
-      drawMedalLine(MEDALS[medal], W / 2, UI_T + 134, 26, MEDALS[medal].name + '!', { fill: MEDALS[medal].color });
-      ctx.globalAlpha = 1;
-    }
+    // "Ny värld!" och en ny medalj står uppe till höger, under krafterna, så att de inte
+    // skymmer väggen; de tonar bort efter en stund
+    const right = VX1 - 16;
     const shown = (time - worldShownAt) / 2;
     if (shown >= 0 && shown < 1) {
       ctx.globalAlpha = shown < 0.75 ? 1 : (1 - shown) * 4;
-      say('Ny värld!', W / 2, 190, 40, { fill: C.banana });
-      say(worldAt(climbed).name, W / 2, 232, 26);
-      say(`+${WORLD_BONUS} blå mynt`, W / 2, 266, 18, { fill: C.blue });
+      say('Ny värld!', right, UI_T + 122, 26, { fill: C.banana, align: 'right' });
+      say(worldAt(climbed).name, right, UI_T + 148, 17, { align: 'right' });
+      say(`+${WORLD_BONUS} blå mynt`, right, UI_T + 168, 14, { fill: C.blue, align: 'right' });
+      ctx.globalAlpha = 1;
+    }
+    const mk = (time - medalShownAt) / 1.8;
+    if (medal >= 0 && mk >= 0 && mk < 1) {
+      ctx.globalAlpha = mk < 0.75 ? 1 : (1 - mk) * 4;
+      drawMedalLine(MEDALS[medal], right, UI_T + 198, 18, MEDALS[medal].name + '!', { fill: MEDALS[medal].color, align: 'right' });
       ctx.globalAlpha = 1;
     }
     for (const p of popups) {
