@@ -218,6 +218,19 @@
     return 0;
   }
 
+  // ---------- Medaljerna ----------
+
+  // Medaljer för höjden i en runda, som Flappy Games för poängen: brons vid 35 m, silver
+  // vid 70 m och guld vid 120 m. Den bästa man når räknas in i samlingen när man faller.
+  const MEDALS = [
+    { id: 'brons', name: 'Bronsmedalj', at: 35, color: C.medals[2] },
+    { id: 'silver', name: 'Silvermedalj', at: 70, color: C.medals[1] },
+    { id: 'guld', name: 'Guldmedalj', at: 120, color: C.medals[0] },
+  ];
+  const medalCount = MEDALS.map(m => {
+    try { return Math.max(0, Math.floor(Number(JSON.parse(load('climbing-medaljer') || '{}')[m.id]) || 0)); } catch { return 0; }
+  });
+
   // ---------- Spelet ----------
 
   // ready (startskärmen) → playing → falling → over: rutan med höjden och rekordet.
@@ -232,6 +245,8 @@
   let items = [], box = ITEMS.map(() => 0), nextItemAt = 0, boost = 0;
   // världen figuren har klättrat in i den här rundan, och när den kom dit
   let worldStep = 0, worldShownAt = -10;
+  // den bästa medaljen den här rundan (-1 för ingen), och när den kom
+  let medal = -1, medalShownAt = -10;
   // 'figures', 'settings' och 'scores' är rutorna på startskärmen; 'entry' är namnrutan
   let overlay = null;
   let best = Math.max(0, Math.floor(Number(load('climbing-best')) || 0)), newBest = false;
@@ -248,6 +263,7 @@
     state = 'playing'; climbed = 0; nextSpawnAt = 200; nextMilestone = 10;
     playerX = W / 2; playerY = PLAYER_Y; fallVy = 0; fallSpin = 0;
     falling = []; popups = []; newBest = false; placed = 0; startedAt = time;
+    medal = -1; medalShownAt = -10;
     items = []; box = ITEMS.map(() => 0); nextItemAt = 120; boost = 0;
     worldStep = 0; worldShownAt = -10;
     holds.clear();
@@ -269,6 +285,10 @@
     state = 'falling'; fallVy = -320;
     play('crash', 0.8);
     if (meters() > best) { best = meters(); newBest = true; store('climbing-best', best); }
+    if (medal >= 0) {
+      medalCount[medal]++;
+      store('climbing-medaljer', JSON.stringify(Object.fromEntries(MEDALS.map((m, i) => [m.id, medalCount[i]]))));
+    }
     // så att listan är färsk när fallet är över och det avgörs om man kom in på den
     refreshBoard();
   }
@@ -348,6 +368,10 @@
       }
       falling = falling.filter(f => f.y < VY1 + 60);
       while (Math.floor(climbed / WORLD_SPAN) > worldStep) { worldStep++; enterWorld(); }
+      // en medalj när höjden når nästa gräns; flera på en gång ger bara den högsta
+      let m = medal;
+      while (m + 1 < MEDALS.length && meters() >= MEDALS[m + 1].at) m++;
+      if (m !== medal) { medal = m; medalShownAt = time; play('fanfare', 0.5); }
       // var tionde meter, utom där en ny värld säger det själv
       if (meters() >= nextMilestone) {
         if (nextMilestone % WORLD_METERS) { popups.push({ text: `${nextMilestone} m!`, at: time }); play('score', 0.5); }
@@ -2349,6 +2373,39 @@
     say(FIGURES[figure].name, W / 2, 372, 22);
     drawButton(START_BTN, 'Starta', 34, { pulse: true });
     drawStartButtons();
+    drawMedalBadge();
+  }
+
+  function drawMedal(m, x, y, r) {
+    poly([[x - r * 0.9, y - r * 1.7], [x - r * 0.2, y - r * 1.7], [x + r * 0.3, y - r * 0.5], [x - r * 0.4, y - r * 0.5]], '#2f80ed');
+    poly([[x + r * 0.2, y - r * 1.7], [x + r * 0.9, y - r * 1.7], [x + r * 0.4, y - r * 0.5], [x - r * 0.3, y - r * 0.5]], '#e63946');
+    ovalEdge(x, y, r, r, m.color, C.ink);
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y, r * 0.62, 0, Math.PI * 2); ctx.stroke();
+    blob(x - r * 0.35, y - r * 0.35, r * 0.22, 'rgba(255,255,255,0.7)');
+  }
+
+  // En medalj och dess namn, centrerade kring x.
+  function drawMedalLine(m, x, y, size, text, opts) {
+    ctx.font = `${opts.weight ?? ''} ${size}px ${opts.font ?? DISPLAY}`.trim();
+    const r = size * 0.5, tw = ctx.measureText(text).width, left = x - (tw + r * 2 + 8) / 2;
+    drawMedal(m, left + r, y, r);
+    say(text, left + r * 2 + 8, y + 1, size, { ...opts, align: 'left' });
+  }
+
+  // Medaljsamlingen överst på startskärmen, som i Flappy Game: hur många av varje; de
+  // man inte har är bleka.
+  const medalBadge = () => ({ x: W / 2 - 58, y: UI_T + 14, w: 116, h: 44 });
+  function drawMedalBadge() {
+    const b = medalBadge();
+    drawButtonFrame(b);
+    MEDALS.forEach((m, i) => {
+      const x = b.x + 16 + i * 34;
+      ctx.globalAlpha = medalCount[i] ? 1 : 0.35;
+      drawMedal(m, x, b.y + 25, 9);
+      ctx.globalAlpha = 1;
+      say(String(medalCount[i]), x + 12, b.y + 25, 15, { font: BODY, weight: '800', fill: C.ink, outline: null, align: 'left' });
+    });
   }
 
   // ---------- Rutorna ----------
@@ -2532,7 +2589,7 @@
   function drawOver() {
     dim();
     if (overlay === 'entry') return;
-    const pw = 260, ph = placed ? 250 : 210, px = W / 2 - pw / 2, py = 160;
+    const pw = 260, ph = placed ? 280 : 240, px = W / 2 - pw / 2, py = 150;
     say('Du föll!', W / 2, 122, 56, { fill: C.banana });
     drawPanel({ x: px, y: py, w: pw, h: ph });
     say('HÖJD', W / 2 - 62, py + 38, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
@@ -2540,15 +2597,18 @@
     say(`${meters()} m`, W / 2 - 62, py + 84, 40, { fill: C.ink, outline: null });
     say(`${best} m`, W / 2 + 62, py + 84, 40, { fill: C.ink, outline: null });
     drawBoxRow(box, px + 28, py + 128, { color: C.ink, outline: null, step: 34, empty: 'Lådan är tom' });
+    const next = MEDALS[medal + 1];
+    if (medal >= 0) drawMedalLine(MEDALS[medal], W / 2, py + 166, 22, MEDALS[medal].name + '!', { fill: C.ink, outline: null });
+    else say(`${next.at} m ger en ${next.name.toLowerCase()}`, W / 2, py + 166, 14, { font: BODY, weight: '800', fill: C.dirt, outline: null });
     if (newBest) {
-      rr(W / 2 - 70, py + 155, 140, 34, 17);
+      rr(W / 2 - 70, py + 189, 140, 34, 17);
       ctx.fillStyle = C.banana; ctx.fill();
       ctx.strokeStyle = C.ink; ctx.lineWidth = 3; ctx.stroke();
-      say('Nytt rekord!', W / 2, py + 173, 18, { fill: C.ink, outline: null });
+      say('Nytt rekord!', W / 2, py + 207, 18, { fill: C.ink, outline: null });
     } else {
-      say(`Värld ${worldIndex(climbed) + 1}: ${worldAt(climbed).name}`, W / 2, py + 173, 15, { font: BODY, weight: '800', fill: C.dirt, outline: null });
+      say(`Värld ${worldIndex(climbed) + 1}: ${worldAt(climbed).name}`, W / 2, py + 207, 15, { font: BODY, weight: '800', fill: C.dirt, outline: null });
     }
-    if (placed) say(`Plats ${placed} på topplistan!`, W / 2, py + 218, 18, { fill: C.ink, outline: null });
+    if (placed) say(`Plats ${placed} på topplistan!`, W / 2, py + 250, 18, { fill: C.ink, outline: null });
     if (time - overAt > 0.6) say('Tryck för att gå till startskärmen', W / 2, py + ph + 40, 20);
   }
 
@@ -2557,6 +2617,12 @@
     say(`${meters()} m`, W / 2, UI_T + 46, 44);
     say(`Rekord ${best} m`, W / 2, UI_T + 80, 14, { font: BODY, weight: '800' });
     say(`${worldAt(climbed).name} · värld ${worldIndex(climbed) + 1} av ${WORLDS.length}`, W / 2, UI_T + 100, 13, { font: BODY, weight: '800' });
+    const mk = (time - medalShownAt) / 1.8;
+    if (medal >= 0 && mk >= 0 && mk < 1) {
+      ctx.globalAlpha = mk < 0.75 ? 1 : (1 - mk) * 4;
+      drawMedalLine(MEDALS[medal], W / 2, UI_T + 134, 26, MEDALS[medal].name + '!', { fill: MEDALS[medal].color });
+      ctx.globalAlpha = 1;
+    }
     const shown = (time - worldShownAt) / 2;
     if (shown >= 0 && shown < 1) {
       ctx.globalAlpha = shown < 0.75 ? 1 : (1 - shown) * 4;

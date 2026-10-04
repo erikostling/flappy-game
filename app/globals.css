@@ -45,6 +45,23 @@ canvas {
   visibility: hidden;
   pointer-events: none;
 }
+/* Knappen tillbaka till spelväljaren, uppe till vänster i båda spelen. */
+.back {
+  position: absolute;
+  z-index: 2;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  padding: 8px 16px;
+  background: var(--panel);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  text-decoration: none;
+}
+.back:focus-visible { outline: 3px solid var(--banana); outline-offset: 3px; }
+
 /* Klassernas display-regler får inte visa det som är dolt. */
 [hidden] { display: none !important; }
 

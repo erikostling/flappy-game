@@ -21,7 +21,8 @@ const DESCRIPTION = [
   'Mellan hindren kan du plocka upp en sköld som tar en krock, en magnet som drar till sig saker och slow motion.',
   'Var 20:e poäng flyger du vidare till nästa av tio världar, med egen bakgrund, egna hinder och egen musik, och varje ny värld ger 2 blå mynt.',
   'Från den sjätte världen blir öppningarna smalare och från den åttonde rör sig hindren.',
-  '10, 25 och 50 poäng i en omgång ger brons-, silver- och guldmedalj; dina medaljer visas uppe till vänster på startskärmen.',
+  '10, 25 och 50 poäng i en omgång ger brons-, silver- och guldmedalj; dina medaljer visas överst i mitten av startskärmen.',
+  'Knappen Spel uppe till vänster tar dig tillbaka till spelväljaren.',
   'Knapparna längst ner på startskärmen öppnar Figurer, Inställningar och Topplista; F och T fungerar också.',
   'Uppe till höger visas din figur och den högsta nivå du har nått.',
   'M och N stänger av och sätter på ljudeffekter och musik.',
@@ -49,6 +50,7 @@ export default function FlappyGame() {
           </div>
         </form>
       </div>
+      <a className="back" href="/" id="back">← Spel</a>
       <div className="safe" id="safe" aria-hidden="true" />
       <Script src={`/game.js?v=${GAME_VERSION}`} strategy="afterInteractive" />
     </main>

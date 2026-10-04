@@ -25,6 +25,7 @@ const DESCRIPTION = [
   'Poängen är hur många meter du har klättrat. När du har fallit visas höjden och ditt rekord, och ett tryck tar dig tillbaka till startskärmen.',
   'Var 40:e meter klättrar du in i en ny av 43 världar, med en egen vägg och egna saker som faller, och varje ny värld ger 2 blå mynt.',
   'Kommer du in på topplistan skriver du ditt namn där.',
+  '35, 70 och 120 meter i en runda ger brons-, silver- och guldmedalj; dina medaljer visas överst på startskärmen.',
   'Knapparna längst ner på startskärmen öppnar Figurer, Inställningar och Topplista; F och T fungerar också.',
   'Under Figurer väljer du vem som klättrar. Låsta figurer köper du där med blå mynt, till samma pris som i Flappy Game; priset står i hörnet. Figurerna och mynten är desamma i båda spelen.',
   'M och N stänger av och sätter på ljudeffekter och musik, i båda spelen.',
@@ -47,7 +48,7 @@ export default function ClimbingGame() {
           <button type="button" className="secondary" id="climb-entry-skip">Hoppa över</button>
         </div>
       </form>
-      <a className={styles.back} href="/" id="climb-back">← Spel</a>
+      <a className="back" href="/" id="climb-back">← Spel</a>
       <div className={styles.safe} id="climb-safe" aria-hidden="true" />
       <Script src={`/climbing.js?v=${GAME_VERSION}`} strategy="afterInteractive" />
     </main>

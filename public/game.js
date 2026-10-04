@@ -4442,8 +4442,10 @@
   const settingsBtn = () => bottomBtn((W - BTN_W) / 2);
   const scoresBtn = () => bottomBtn(W - 14 - BTN_W);
   const startBtn = () => ({ x: W / 2 - 110, y: 386 + MID, w: 220, h: 64 });
-  const levelBadge = () => ({ x: UI_R - 14 - 132, y: UI_T + 14, w: 132, h: 44 });
-  const medalBadge = () => ({ x: UI_L + 14, y: UI_T + 14, w: 132, h: 44 });
+  const levelBadge = () => ({ x: UI_R - 14 - 120, y: UI_T + 14, w: 120, h: 44 });
+  // medaljerna i mitten, så att knappen tillbaka till spelväljaren får hörnet; båda
+  // brickorna är smala nog att få plats bredvid den på en mobil
+  const medalBadge = () => ({ x: W / 2 - 58, y: UI_T + 14, w: 116, h: 44 });
 
   function drawGear(cx, cy) {
     ctx.save();
@@ -4497,11 +4499,11 @@
     const b = medalBadge();
     drawButtonFrame(b, false);
     MEDALS.forEach((m, i) => {
-      const x = b.x + 18 + i * 40;
+      const x = b.x + 16 + i * 34;
       ctx.globalAlpha = medalCount[i] ? 1 : 0.35;
       drawMedal(m, x, b.y + 25, 9);
       ctx.globalAlpha = 1;
-      say(String(medalCount[i]), x + 13, b.y + 25, 15, { font: BODY, weight: '800', fill: C.ink, stroke: null, align: 'left' });
+      say(String(medalCount[i]), x + 12, b.y + 25, 15, { font: BODY, weight: '800', fill: C.ink, stroke: null, align: 'left' });
     });
   }
 
@@ -4916,11 +4918,16 @@
   });
 
   let last = 0;
+  // Knappen tillbaka till spelväljaren syns bara på startskärmen, när ingen ruta är
+  // öppen; under spelet står världens namn i hörnet.
+  const backLink = document.getElementById('back');
   function frame(now) {
     const dt = last ? Math.min((now - last) / 1000, 1 / 30) : 0;
     last = now;
     update(dt);
     draw();
+    const showBack = state === 'ready' && !overlay;
+    if (backLink && backLink.hidden === showBack) backLink.hidden = !showBack;
     sfx.tickMusic([world().song, world().fallback]);
     requestAnimationFrame(frame);
   }
