@@ -1,7 +1,9 @@
 import { versioned } from '@/lib/versioned';
+import { NameStep } from './player';
 import styles from './page.module.css';
 
-// Första sidan: spelen att välja mellan, i ett rutnät med två i bredd. Där ett spel
+// Första sidan: först namnsteget (app/player.tsx), sedan spelen att välja mellan, i ett
+// rutnät med två i bredd. Där ett spel
 // saknas för att fylla rutnätet står det att ett kommer snart. Varje spel är en egen
 // sida. Länken laddar spelets sida på nytt, så att ett spel börjar från början varje
 // gång och slutar spela musik när man går därifrån. Ett spel som inte är öppet för alla än (`soon`)
@@ -57,6 +59,7 @@ export default function Home() {
           </li>
         ))}
       </ul>
+      <NameStep />
     </main>
   );
 }

@@ -65,7 +65,16 @@ canvas {
 /* Klassernas display-regler får inte visa det som är dolt. */
 [hidden] { display: none !important; }
 
-/* Namnrutan för topplistan; skalar med spelet via --s. */
+/* Namnsteget på första sidan, som täcker spelväljaren tills man har skrivit sitt namn
+   (app/player.tsx); app/layout.tsx sätter ask-name. */
+.name-step {
+  display: none;
+  position: fixed; inset: 0; z-index: 10;
+  background: radial-gradient(circle at 50% 0%, #1f5236, var(--ground) 70%);
+}
+.ask-name .name-step { display: block; }
+
+/* Namnrutan; skalar med spelet via --s. */
 .entry {
   position: absolute; left: 50%; top: 45%;
   transform: translate(-50%, -50%);
