@@ -15,7 +15,7 @@ const DESCRIPTION = [
   'Bilen kör bara medan du håller fingret på skärmen, eller pil upp, W eller mellanslag; släpper du stannar den.',
   'Dra fingret åt sidan så följer bilen med, eller styr med pil- eller A- och D-tangenterna.',
   'Håll dig på banan: på gräset går det långsammare, och i kurvorna drar bilen utåt. Kartan uppe till höger visar var på banan du är.',
-  'Poängen är tiden för varvet; ju snabbare desto bättre. Sakerna på banan drar av tid, från en tiondels sekund för ett mynt till en hel sekund för en diamant, och blå mynt köper figurer.',
+  'Poängen är tiden för varvet; ju snabbare desto bättre. Sakerna på banan skjuter bilen framåt, från ett vitt streck i mittlinjen för ett mynt till fyra för en diamant, och blå mynt köper figurer.',
   'Knapparna längst ner på startskärmen öppnar Figurer, Inställningar och Topplista.',
 ].join(' ');
 

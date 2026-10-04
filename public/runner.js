@@ -272,9 +272,9 @@
   let time = 0, overAt = 0, climbed = 0, nextSpawnAt = 0, nextMilestone = 0;
   let playerX = W / 2, playerY = PLAYER_Y, fallVy = 0, fallSpin = 0, spinV = 0;
   let obstacles = [], popups = [], startedAt = 0;
-  // Car Game: farten, tiden för varvet i hundradelar, hur mycket bilen lutar när den
-  // svänger, och de blå mynten på banan
-  let carSpeed = 0, lapTime = 0, timeBonus = 0, steerTilt = 0, lastX = W / 2, raceItems = [];
+  // Car Game: farten, tiden för varvet i hundradelar, hur långt bilen har kvar att fara
+  // framåt efter en sak, hur mycket den lutar när den svänger, och sakerna på banan
+  let carSpeed = 0, lapTime = 0, surge = 0, steerTilt = 0, lastX = W / 2, raceItems = [];
   // de fyra motståndarna, när man senast krockade med en, och vilken plats man kom på
   let rivals = [], lastBump = -10, place = 0;
   // sakerna på väggen, vad som har hamnat i lådan den här rundan, och metrarna som
@@ -358,13 +358,13 @@
     state = 'playing'; climbed = 0; nextSpawnAt = CAR ? 300 : 200; nextMilestone = TRACK.milestone;
     playerX = W / 2; playerY = PLAYER_Y; fallVy = 0; fallSpin = 0; spinV = 0;
     obstacles = []; popups = []; newBest = false; placed = 0; startedAt = time;
-    carSpeed = 0; lapTime = 0; timeBonus = 0; steerTilt = 0; lastX = W / 2; place = 0;
+    carSpeed = 0; lapTime = 0; surge = 0; steerTilt = 0; lastX = W / 2; place = 0;
     raceItems = CAR ? placeRaceItems() : [];
     rivals = CAR ? placeRivals() : [];
     // i Car Game börjar man bakom startlinjen, och klockan går först efter nedräkningen
     if (CAR) { climbed = START_BEHIND; startedAt = time + COUNTDOWN; }
     medal = -1; medalShownAt = -10;
-    items = []; box = ITEMS.map(() => 0); nextItemAt = 120; bonus = 0;
+    items = []; box = ITEMS.map(() => 0); nextItemAt = CAR ? Infinity : 120; bonus = 0;
     worldStep = 0; worldShownAt = -10;
     powers = []; shield = false; magnetUntil = slowUntil = safeUntil = 0; flash = 0;
     holds.clear(); drags.clear(); pedals.clear(); swipeTarget = null;
@@ -607,9 +607,12 @@
   }
 
   // Sakerna på banan, samma som i de andra spelen men med mest paket. Varje sak man kör
-  // över drar av tid från varvet, en tiondels sekund per poäng (en diamant en hel
-  // sekund), och ett blått mynt går till kassan. Ibland ligger tre i en rad tvärs över
-  // banan, så att man får välja.
+  // över skjuter bilen framåt, fler vita streck i mittlinjen ju finare saken är
+  // (RACE_STRIPES; en diamant fyra), och ett blått mynt går till kassan. Ibland ligger
+  // tre i en rad tvärs över banan, så att man får välja. DASH är ett streck i
+  // mittlinjen och mellanrummet efter det.
+  const DASH = 80;
+  const RACE_STRIPES = { mynt: 1, banan: 1, paket: 2, stjarna: 3, diamant: 4 };
   const RACE_WEIGHTS = { mynt: 22, banan: 15, paket: 33, stjarna: 10, diamant: 5, blamynt: 15 };
   const RACE_KINDS = ITEMS.flatMap((it, i) => Array(RACE_WEIGHTS[it.id] ?? 0).fill(i));
   const RACE_PICK = () => RACE_KINDS[Math.floor(Math.random() * RACE_KINDS.length)];
@@ -652,8 +655,9 @@
       r.lat += (r.wantLat - r.lat) * Math.min(1, t * 1.5);
       if (Math.random() < t * 0.3) r.wantLat = (Math.random() - 0.5) * (ROADW - 70);
       if (!r.done && r.s >= LAP) r.done = true;
-      // en krock: bilen tappar fart och knuffas isär från motståndaren
-      if (Math.abs(r.s - climbed) < 62 && Math.abs(r.lat - lane) < 34) {
+      // en krock: bilen tappar fart och knuffas isär från motståndaren, men inte medan
+      // en sak skjuter den framåt
+      if (surge <= 0 && Math.abs(r.s - climbed) < 62 && Math.abs(r.lat - lane) < 34) {
         const side = Math.sign(lane - r.lat) || 1;
         carSpeed = Math.min(carSpeed, r.speed * 0.8);
         shiftCar(side * 4);
@@ -689,6 +693,11 @@
     shiftCar(-curveAt(climbed) * carSpeed * carSpeed * 0.28 * t);
     if (t > 0) steerTilt += (Math.max(-0.35, Math.min(0.35, (playerX - lastX) / t * 0.0025)) - steerTilt) * Math.min(1, t * 10);
     lastX = playerX;
+    // efter en sak far bilen framåt, fort först och sedan saktare, tills den är framme
+    if (surge > 0) {
+      const go = Math.min(surge, Math.max(surge * t * 8, 240 * t));
+      climbed += go; surge -= go;
+    }
     for (const it of raceItems) {
       if (Math.abs(it.s - climbed) < 30 && Math.abs(it.lat - (playerX - W / 2)) < 28) collectRaceItem(it);
     }
@@ -697,9 +706,8 @@
     return null;
   }
 
-  // tiden på klockan: hur länge man har kört, minus det sakerna har dragit av
-  const lapClock = () => Math.max(0, raceTime() - timeBonus);
-  const seconds = cs => (cs / 100).toFixed(1).replace('.', ',');
+  // tiden på klockan: hur länge man har kört, och noll under nedräkningen
+  const lapClock = () => Math.max(0, raceTime());
 
   function collectRaceItem(it) {
     const item = ITEMS[it.kind];
@@ -711,15 +719,16 @@
       play('collect', 0.6, 1.3);
       return;
     }
-    timeBonus += item.value * 10;
-    popups.push({ text: `−${seconds(item.value * 10)} s`, at: time, x: playerX, y: PLAYER_Y - 60, life: 1.6, size: 26 });
-    play('collect', 0.6, 1 + item.value * 0.04);
+    const stripes = RACE_STRIPES[item.id] ?? 1;
+    surge += stripes * DASH;
+    popups.push({ text: `${stripes} streck fram!`, at: time, x: playerX, y: PLAYER_Y - 60, life: 1.6, size: 22 });
+    play('collect', 0.6, 1 + stripes * 0.1);
   }
 
   // I mål: tiden, rekordet och medaljen, och sedan rutan. Listan hämtas först, så att det
   // går att avgöra om tiden kom in på den.
   function finishRace() {
-    lapTime = Math.max(1, raceTime() - timeBonus);
+    lapTime = Math.max(1, raceTime());
     place = 1 + rivals.filter(r => r.done).length;
     climbed = LAP;
     state = 'over'; overAt = time;
@@ -2832,7 +2841,7 @@
     }
     ctx.strokeStyle = ROAD.line; ctx.lineWidth = 3;
     for (let i = 1; i < mid.length; i++) {
-      if (Math.floor(mid[i][0] / 40) % 2) continue;
+      if (Math.floor(mid[i][0] / (DASH / 2)) % 2) continue;
       ctx.beginPath(); ctx.moveTo(mid[i - 1][1][0], mid[i - 1][1][1]); ctx.lineTo(mid[i][1][0], mid[i][1][1]); ctx.stroke();
     }
     // mållinjen: rutigt band tvärs över banan
