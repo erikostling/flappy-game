@@ -294,18 +294,21 @@
     items = []; box = ITEMS.map(() => 0); nextItemAt = 120; boost = 0;
     worldStep = 0; worldShownAt = -10;
     powers = []; shield = false; magnetUntil = slowUntil = safeUntil = 0; flash = 0;
-    holds.clear(); drags.clear();
+    holds.clear(); drags.clear(); swipeTarget = null;
   }
 
   // Medan man håller på vänster eller höger sida glider figuren åt det hållet. Ett
   // tryck flyttar den genast en liten bit, så att också ett kort tryck märks.
   // `holds` är fingrar och tangenter som håller just nu, med sitt håll.
   //
-  // Sveper fingret åt sidan i stället följer figuren med, lika långt som fingret.
-  // `drags` är fingrarna som ligger mot skärmen: var de började, och från var de
-  // styr figuren när de har börjat svepa.
+  // Sveper fingret åt sidan i stället följer figuren med, lite långsammare än fingret:
+  // den ska till en punkt en bit kortare bort (SWIPE_FOLLOW) och glider dit mjukt
+  // (SWIPE_EASE). `drags` är fingrarna som ligger mot skärmen: var de började, och från
+  // var de styr figuren när de har börjat svepa. `swipeTarget` är dit figuren glider.
   const holds = new Map(), drags = new Map();
   const SWIPE = 6; // så många pixlar fingret ska röra sig innan det räknas som ett svep
+  const SWIPE_FOLLOW = 0.7, SWIPE_EASE = 8;
+  let swipeTarget = null;
   const steering = () => { let d = 0; for (const dir of holds.values()) d += dir; return Math.sign(d); };
   const clampX = x => Math.max(MIN_X, Math.min(MAX_X, x));
   function hold(id, dir) {
@@ -322,7 +325,7 @@
       d.swiping = true; d.fromClientX = e.clientX; d.fromX = playerX;
       holds.delete(e.pointerId);
     }
-    playerX = clampX(d.fromX + (e.clientX - d.fromClientX) / scale);
+    swipeTarget = clampX(d.fromX + (e.clientX - d.fromClientX) / scale * SWIPE_FOLLOW);
   }
 
   function crash() {
@@ -426,6 +429,11 @@
       boost -= lift;
       climbed += v * t + lift;
       playerX = clampX(playerX + steering() * STEER * dt);
+      if (swipeTarget !== null) {
+        playerX += (swipeTarget - playerX) * Math.min(1, dt * SWIPE_EASE);
+        // när fingret har släppt och figuren har kommit fram slutar den glida
+        if (!drags.size && Math.abs(swipeTarget - playerX) < 0.5) swipeTarget = null;
+      }
       if (climbed >= nextSpawnAt) { spawn(); nextSpawnAt = climbed + spawnGap(); }
       if (climbed >= nextItemAt) {
         if (Math.random() < POWER_CHANCE) spawnPower();
